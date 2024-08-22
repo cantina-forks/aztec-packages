@@ -1,4 +1,5 @@
-// Minimal NFT implementation with `AuthWit` support.
+// Minimal NFT implementation with `AuthWit` support that allows minting and burning in public-only and transfers
+// in both public and private.
 contract NFT {
     #[aztec(event)]
     struct Transfer {
@@ -25,7 +26,7 @@ contract NFT {
         nft_exists: Map<Field, PublicMutable<bool>>,
         // A map from token ID to the public owner of the NFT.
         public_owners: Map<Field, PublicMutable<AztecAddress>>,
-        // Contains the NFTs that are pending to be shielded.
+        // Contains the NFTs that are waiting to be shielded.
         pending_shields: PrivateSet<TransparentNote>,
     }
 
@@ -122,6 +123,18 @@ contract NFT {
         ...
     }
 
+    #[aztec(public)]
+    fn shield(from: AztecAddress, token_id: Field, secret_hash: Field, nonce: Field) {
+        if (!from.eq(context.msg_sender())) {
+            // The redeem is only spendable once, so we need to ensure that you cannot insert multiple shields from the same message.
+            assert_current_call_valid_authwit_public(&mut context, from);
+        } else {
+            assert(nonce == 0, "invalid nonce");
+        }
+
+        ...
+    }
+
     #[aztec(private)]
     fn transfer(to: AztecAddress, token_id: Field) {
         ...
@@ -132,14 +145,36 @@ contract NFT {
         ...
     }
 
+    // Burns public NFT
+    #[aztec(public)]
+    fn burn_public(from: AztecAddress, amount: Field, nonce: Field) {
+        // docs:start:assert_current_call_valid_authwit_public
+        if (!from.eq(context.msg_sender())) {
+            assert_current_call_valid_authwit_public(&mut context, from);
+        } else {
+            assert(nonce == 0, "invalid nonce");
+        }
+        ...
+    }
+
+    // Burns private NFT (enqueues a public function which udpates nft_exists map)
     #[aztec(private)]
-    fn burn(from: AztecAddress, token_id: Field, nonce: Field) {
+    fn burn(from: AztecAddress, amount: Field, nonce: Field) {
+        ...
+    }
+
+    #[aztec(private)]
+    fn redeem_shield(to: AztecAddress, amount: Field, secret: Field) {
+        ...
+    }
+
+    #[aztec(private)]
+    fn unshield(from: AztecAddress, to: AztecAddress, amount: Field, nonce: Field) {
         if (!from.eq(context.msg_sender())) {
             assert_current_call_valid_authwit(&mut context, from);
         } else {
             assert(nonce == 0, "invalid nonce");
         }
-
         ...
     }
 
