@@ -1,5 +1,5 @@
-// Minimal NFT implementation with `AuthWit` support that allows minting and burning in public-only and transfers
-// in both public and private.
+// Minimal NFT implementation with `AuthWit` support that allows minting in public-only and transfers in both public
+// and private.
 contract NFT {
     #[aztec(event)]
     struct Transfer {
@@ -147,19 +147,13 @@ contract NFT {
 
     // Burns public NFT
     #[aztec(public)]
-    fn burn_public(from: AztecAddress, amount: Field, nonce: Field) {
+    fn burn(from: AztecAddress, amount: Field, nonce: Field) {
         // docs:start:assert_current_call_valid_authwit_public
         if (!from.eq(context.msg_sender())) {
             assert_current_call_valid_authwit_public(&mut context, from);
         } else {
             assert(nonce == 0, "invalid nonce");
         }
-        ...
-    }
-
-    // Burns private NFT (enqueues a public function which udpates nft_exists map)
-    #[aztec(private)]
-    fn burn(from: AztecAddress, amount: Field, nonce: Field) {
         ...
     }
 
