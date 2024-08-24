@@ -8,6 +8,7 @@
 #include "barretenberg/ecc/curves/grumpkin/grumpkin.hpp"
 #include "barretenberg/ecc/fields/field_conversion.hpp"
 #include "barretenberg/honk/proof_system/types/proof.hpp"
+#include "barretenberg/transcript/tag.hpp"
 #include <concepts>
 
 namespace bb {
@@ -17,6 +18,17 @@ concept Loggable =
     (std::same_as<T, bb::fr> || std::same_as<T, grumpkin::fr> || std::same_as<T, bb::g1::affine_element> ||
      std::same_as<T, grumpkin::g1::affine_element> || std::same_as<T, uint32_t>);
 
+template <typename T, typename = void> struct is_iterable : std::false_type {};
+
+// this gets used only when we can call std::begin() and std::end() on that type
+template <typename T>
+struct is_iterable<T, std::void_t<decltype(std::begin(std::declval<T&>())), decltype(std::end(std::declval<T&>()))>>
+    : std::true_type {};
+
+template <typename T> constexpr bool is_iterable_v = is_iterable<T>::value;
+
+template <typename T>
+concept InCircuit = !(std::same_as<T, bb::fr> || std::same_as<T, grumpkin::fr>);
 // class TranscriptManifest;
 class TranscriptManifest {
     struct RoundData {
@@ -85,6 +97,7 @@ struct NativeTranscriptParams {
     }
 };
 
+static size_t unique_transcript_index = 0;
 /**
  * @brief Common transcript class for both parties. Stores the data for the current round, as well as the
  * manifest.
@@ -93,7 +106,10 @@ template <typename TranscriptParams> class BaseTranscript {
   public:
     using Fr = typename TranscriptParams::Fr;
     using Proof = typename TranscriptParams::Proof;
-
+    static constexpr bool in_circuit = InCircuit<Fr>;
+    size_t round_index = 0;
+    size_t transcipt_index = 0;
+    bool reception_phase = true;
     BaseTranscript() = default;
 
     /**
@@ -103,7 +119,12 @@ template <typename TranscriptParams> class BaseTranscript {
      */
     explicit BaseTranscript(const Proof& proof_data)
         : proof_data(proof_data.begin(), proof_data.end())
-    {}
+    {
+        if constexpr (in_circuit) {
+            transcipt_index = unique_transcript_index;
+            unique_transcript_index++;
+        }
+    }
 
     static constexpr size_t HASH_OUTPUT_SIZE = 32;
 
@@ -281,6 +302,15 @@ template <typename TranscriptParams> class BaseTranscript {
             challenges[i] = TranscriptParams::template convert_challenge<ChallengeType>(challenge_buffer);
         }
 
+        if constexpr (in_circuit) {
+            if (reception_phase) {
+                reception_phase = false;
+            }
+
+            for (size_t i = 0; i < num_challenges; i++) {
+                challenges[i].set_origin_tag(OriginTag(transcipt_index, round_index, /*is_submitted=*/false));
+            }
+        }
         // Prepare for next round.
         ++round_number;
 
@@ -334,6 +364,19 @@ template <typename TranscriptParams> class BaseTranscript {
         BaseTranscript::consume_prover_element_frs(label, element_frs);
 
         auto element = TranscriptParams::template convert_from_bn254_frs<T>(element_frs);
+        if constexpr (in_circuit) {
+            if (!reception_phase) {
+                reception_phase = true;
+                round_index++;
+            }
+            if constexpr (is_iterable_v<T>) {
+                for (auto& subelement : element) {
+                    subelement.set_origin_tag(OriginTag(transcipt_index, round_index, /*is_submitted=*/true));
+                }
+            } else {
+                element.set_origin_tag(OriginTag(transcipt_index, round_index, /*is_submitted=*/true));
+            }
+        }
 
 #ifdef LOG_INTERACTIONS
         if constexpr (Loggable<T>) {

@@ -124,6 +124,8 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::operator+(const element& other) con
     bool_ct result_is_infinity = infinity_predicate && (!lhs_infinity && !rhs_infinity);
     result_is_infinity = result_is_infinity || (lhs_infinity && rhs_infinity);
     result.set_point_at_infinity(result_is_infinity);
+
+    result.set_origin_tag(OriginTag(get_origin_tag(), other.get_origin_tag()));
     return result;
 }
 
@@ -155,6 +157,7 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::operator-(const element& other) con
         // Current gate count: 6398
         std::vector<element> points{ *this, other };
         std::vector<Fr> scalars{ 1, -Fr(1) };
+
         return batch_mul(points, scalars);
     }
 
@@ -202,6 +205,7 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::operator-(const element& other) con
     bool_ct result_is_infinity = infinity_predicate && (!lhs_infinity && !rhs_infinity);
     result_is_infinity = result_is_infinity || (lhs_infinity && rhs_infinity);
     result.set_point_at_infinity(result_is_infinity);
+    result.set_origin_tag(OriginTag(get_origin_tag(), other.get_origin_tag()));
     return result;
 }
 
@@ -213,7 +217,7 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::checked_unconditional_add(const ele
         // Current gate count: 6398
         std::vector<element> points{ *this, other };
         std::vector<Fr> scalars{ 1, 1 };
-        return goblin_batch_mul(points, scalars);
+        return batch_mul(points, scalars);
     }
 
     other.x.assert_is_not_equal(x);
@@ -230,7 +234,7 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::checked_unconditional_subtract(cons
         // TODO(https://github.com/AztecProtocol/barretenberg/issues/707) Optimize
         std::vector<element> points{ *this, other };
         std::vector<Fr> scalars{ 1, -Fr(1) };
-        return goblin_batch_mul(points, scalars);
+        return batch_mul(points, scalars);
     }
 
     other.x.assert_is_not_equal(x);
@@ -789,6 +793,13 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::batch_mul(const std::vector<element
                                                        const bool with_edgecases)
 {
     auto [points, scalars] = handle_points_at_infinity(_points, _scalars);
+    OriginTag tag{};
+    for (auto& point : _points) {
+        tag = OriginTag(tag, point.get_origin_tag());
+    }
+    for (auto& scalar : _scalars) {
+        tag = OriginTag(tag, scalar.get_origin_tag());
+    }
 
     if constexpr (IsSimulator<C>) {
         // TODO(https://github.com/AztecProtocol/barretenberg/issues/663)
@@ -800,11 +811,14 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::batch_mul(const std::vector<element
             result += (element_t(points[i].get_value()) * scalars[i].get_value());
         }
         result = result.normalize();
-        return from_witness(context, result);
+        auto nonnative_result = from_witness(context, result);
+        return nonnative_result;
     } else {
         // Perform goblinized batched mul if available; supported only for BN254
         if constexpr (IsMegaBuilder<C> && std::same_as<G, bb::g1>) {
-            return goblin_batch_mul(points, scalars);
+            auto result = goblin_batch_mul(points, scalars);
+            result.set_origin_tag(tag);
+            return result;
         } else {
             if (with_edgecases) {
                 std::tie(points, scalars) = mask_points(points, scalars);
@@ -850,6 +864,7 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::batch_mul(const std::vector<element
             }
             accumulator = accumulator - offset_generators.second;
 
+            accumulator.set_origin_tag(tag);
             return accumulator;
         }
     }
@@ -890,7 +905,9 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::operator*(const Fr& scalar) const
     if constexpr (IsMegaBuilder<C> && std::same_as<G, bb::g1>) {
         std::vector<element> points{ *this };
         std::vector<Fr> scalars{ scalar };
-        return goblin_batch_mul(points, scalars);
+        auto result = goblin_batch_mul(points, scalars);
+        result.set_origin_tag(OriginTag(get_origin_tag(), scalar.get_origin_tag()));
+        return result;
     } else {
         constexpr uint64_t num_rounds = Fr::modulus.get_msb() + 1;
 
