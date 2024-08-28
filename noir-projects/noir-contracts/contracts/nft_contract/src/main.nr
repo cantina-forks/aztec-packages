@@ -20,8 +20,6 @@ contract NFT {
         minters: Map<AztecAddress, PublicMutable<bool>>,
         // Contains the NFTs owned by each address in private.
         private_nfts: Map<AztecAddress, PrivateSet<NFTNote>>
-        // Contains number of NFTs owned by each address in public.
-        public_balances: Map<AztecAddress, PublicMutable<U128>>,
         // A map from token ID to a boolean indicating if the NFT exists.
         nft_exists: Map<Field, PublicMutable<bool>>,
         // A map from token ID to the public owner of the NFT.
@@ -103,13 +101,6 @@ contract NFT {
     #[aztec(view)]
     fn is_minter(minter: AztecAddress) -> bool {
         storage.minters.at(minter).read()
-    }
-
-    // Returns the total number of NFTs a given address owns in public.
-    #[aztec(public)]
-    #[aztec(view)]
-    fn balance_of_public(owner: AztecAddress) -> Field {
-        storage.public_balances.at(owner).read().to_integer()
     }
 
     #[aztec(public)]
