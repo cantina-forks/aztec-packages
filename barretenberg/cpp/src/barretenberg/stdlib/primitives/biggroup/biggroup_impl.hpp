@@ -794,11 +794,8 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::batch_mul(const std::vector<element
 {
     auto [points, scalars] = handle_points_at_infinity(_points, _scalars);
     OriginTag tag{};
-    for (auto& point : _points) {
-        tag = OriginTag(tag, point.get_origin_tag());
-    }
-    for (auto& scalar : _scalars) {
-        tag = OriginTag(tag, scalar.get_origin_tag());
+    for (size_t i = 0; i < scalars.size(); i++) {
+        tag = OriginTag(tag, OriginTag(points[i].get_origin_tag(), scalars[i].get_origin_tag()));
     }
 
     if constexpr (IsSimulator<C>) {
@@ -825,7 +822,14 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::batch_mul(const std::vector<element
             }
             const size_t num_points = points.size();
             ASSERT(scalars.size() == num_points);
-
+            std::vector<OriginTag> point_tags;
+            std::vector<OriginTag> scalar_tags;
+            for (size_t i = 0; i < num_points; i++) {
+                point_tags.emplace_back(points[i].get_origin_tag());
+                scalar_tags.emplace_back(scalars[i].get_origin_tag());
+                points[i].set_origin_tag(OriginTag());
+                scalars[i].set_origin_tag(OriginTag());
+            }
             batch_lookup_table point_table(points);
             const size_t num_rounds = (max_num_bits == 0) ? Fr::modulus.get_msb() + 1 : max_num_bits;
 
@@ -865,6 +869,10 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::batch_mul(const std::vector<element
             accumulator = accumulator - offset_generators.second;
 
             accumulator.set_origin_tag(tag);
+            for (size_t i = 0; i < num_points; i++) {
+                points[i].set_origin_tag(point_tags[i]);
+                scalars[i].set_origin_tag(scalar_tags[i]);
+            }
             return accumulator;
         }
     }
@@ -929,7 +937,9 @@ element<C, Fq, Fr, G> element<C, Fq, Fr, G>::operator*(const Fr& scalar) const
         Fq out_x = accumulator.x.conditional_select(skew_output.x, naf_entries[num_rounds]);
         Fq out_y = accumulator.y.conditional_select(skew_output.y, naf_entries[num_rounds]);
 
-        return element(out_x, out_y) - element(offset_generators.second);
+        auto result = element(out_x, out_y) - element(offset_generators.second);
+        result.set_origin_tag(OriginTag(get_origin_tag(), scalar.get_origin_tag()));
+        return result;
     }
 }
 } // namespace bb::stdlib
