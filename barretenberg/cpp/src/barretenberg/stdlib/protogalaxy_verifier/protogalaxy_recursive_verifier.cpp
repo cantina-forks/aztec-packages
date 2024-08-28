@@ -116,6 +116,8 @@ std::shared_ptr<typename VerifierInstances::Instance> ProtoGalaxyRecursiveVerifi
     }
 
     auto& expected_parameters = next_accumulator->relation_parameters;
+    // Needed because initialized relation parameters that aren't taken from transcript are poisoned
+    expected_parameters.unpoison();
     for (size_t inst_idx = 0; inst_idx < VerifierInstances::NUM; inst_idx++) {
         auto instance = instances[inst_idx];
         expected_parameters.eta += instance->relation_parameters.eta * lagranges[inst_idx];
