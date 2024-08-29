@@ -1,7 +1,8 @@
 import { type ServerCircuitProver } from '@aztec/circuit-types';
-import { type EthAddress, Fr, ParityPublicInputs, type RecursiveProof } from '@aztec/circuits.js';
+import { type EthAddress, Fr, type RecursiveProof } from '@aztec/circuits.js';
 import { makeBaseParityInputs } from '@aztec/circuits.js/testing';
 import { createL1Clients, deployL1Contract } from '@aztec/ethereum';
+import { BufferReader } from '@aztec/foundation/serialize';
 import { fileURLToPath } from '@aztec/foundation/url';
 import { type ProtocolArtifact } from '@aztec/noir-protocol-circuits-types';
 import { NoopTelemetryClient } from '@aztec/telemetry-client/noop';
@@ -29,15 +30,13 @@ describe('bb_verifier', () => {
   let tmp: string;
   let circuit: ProtocolArtifact;
   let proof: RecursiveProof<any>;
-  let proofBuf: Buffer;
-  let publicInputs: readonly Fr[];
+  let proofBuffer: Buffer;
 
   beforeAll(async () => {
     const repoRoot = join(fileURLToPath(import.meta.url), '../../../../..');
     const acvmBinaryPath = ACVM_BINARY_PATH ?? join(repoRoot, 'noir/noir-repo/target/release/acvm');
     const bbBinaryPath = BB_BINARY_PATH ?? join(repoRoot, 'barretenberg/cpp/build/bin/bb');
     tmp = await mkdtemp(join(tmpdir(), 'bb-prover-test-'));
-    console.log({ tmp });
 
     prover = await BBNativeRollupProver.new(
       {
@@ -45,6 +44,7 @@ describe('bb_verifier', () => {
         acvmWorkingDirectory: join(tmp, 'acvm'),
         bbBinaryPath,
         bbWorkingDirectory: join(tmp, 'bb-prover'),
+        bbSkipCleanup: true,
       },
       new NoopTelemetryClient(),
     );
@@ -56,27 +56,23 @@ describe('bb_verifier', () => {
   });
 
   afterAll(async () => {
-    // await rm(tmp, { recursive: true });
+    await rm(tmp, { recursive: true });
   });
 
   beforeAll(async () => {
     circuit = 'BaseParityArtifact';
     const result = await prover.getBaseParityProof(makeBaseParityInputs());
     proof = result.proof;
-    publicInputs = ParityPublicInputs.getFields(result.publicInputs);
-    publicInputs = result.proof.proof.slice(0, result.verificationKey.numPublicInputs);
-    proofBuf = result.proof.proof
-      .slice(result.verificationKey.numPublicInputs)
-      .reduce((acc, x) => Buffer.concat([acc, x.toBuffer()]), Buffer.alloc(0));
+    proofBuffer = result.proof.binaryProof.buffer;
   });
 
-  describe('offchain verification', () => {
-    it('verifies proofs locally', async () => {
+  describe('off-chain verification', () => {
+    it('verifies proofs with bb', async () => {
       await expect(verifier.verifyProofForCircuit(circuit, proof.binaryProof)).resolves.toBeUndefined();
     });
   });
 
-  describe('onchain verification', () => {
+  describe('on-chain verification', () => {
     let verifierAddress: EthAddress;
     let verifierContract: GetContractReturnType<any, PublicClient>;
 
@@ -122,10 +118,39 @@ describe('bb_verifier', () => {
       });
     });
 
-    it('verifies proof onchain', async () => {
-      const p = proof.binaryProof.buffer.subarray(publicInputs.length * Fr.SIZE_IN_BYTES).toString('hex');
-      console.log('pub inputs', proof.binaryProof.numPublicInputs);
-      await expect(verifierContract.read.verify(['0x' + p, publicInputs.map(x => x.toString())])).resolves.toBeTruthy();
+    beforeAll(async () => {
+      // const dir = '/tmp/bb-prover-test-7X2sBc/bb-prover/tmp-6IKVgc/ultra_keccak_honk/';
+      // proofBuffer = await readFile(dir + 'proof');
+    });
+
+    it('verifies proof on-chain', async () => {
+      const offset = 4;
+      const headerSize = 3;
+      const numPublicInputs = 19;
+      const proofStart = proofBuffer.subarray(offset, offset + headerSize * Fr.SIZE_IN_BYTES);
+      const publicInputsRaw = proofBuffer.subarray(
+        offset + headerSize * Fr.SIZE_IN_BYTES,
+        offset + headerSize * Fr.SIZE_IN_BYTES + numPublicInputs * Fr.SIZE_IN_BYTES,
+      );
+      const proofEnd = proofBuffer.subarray(
+        offset + headerSize * Fr.SIZE_IN_BYTES + numPublicInputs * Fr.SIZE_IN_BYTES,
+        proofBuffer.length,
+      );
+
+      const proofStr = '0x' + Buffer.concat([proofStart, proofEnd]).toString('hex');
+      const publicInputs = BufferReader.asReader(publicInputsRaw)
+        .readArray(numPublicInputs, Fr)
+        .map(x => x.toString());
+
+      // console.log({
+      //   numPublicInputs,
+      //   proofSize: proofStr.length - 2, // remove 0x
+      //   proofStartSize: 2 * proofStart.length, // hex
+      //   proofEndSize: 2 * proofEnd.length,
+      // });
+      // console.log(publicInputs);
+
+      await expect(verifierContract.read.verify([proofStr, publicInputs])).resolves.toBeTruthy();
     });
   });
 });
