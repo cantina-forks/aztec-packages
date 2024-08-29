@@ -62,7 +62,7 @@ export class BBCircuitVerifier implements ClientProtocolCircuitVerifier {
       workingDirectory,
       circuit,
       ProtocolCircuitArtifacts[circuit],
-      'vk',
+      'ultra_keccak_honk',
       logFn,
     ).then(result => {
       if (result.status === BB_RESULT.FAILURE) {

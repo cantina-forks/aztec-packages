@@ -20,6 +20,7 @@ import {
   EmptyNestedCircuitInputs,
   EmptyNestedData,
   Fr,
+  KECCAK_PROOF_LENGTH,
   type KernelCircuitPublicInputs,
   type MergeRollupInputs,
   NESTED_RECURSIVE_PROOF_LENGTH,
@@ -108,12 +109,28 @@ export interface BBProverConfig extends BBConfig, ACVMConfig {
   circuitFilter?: ServerProtocolArtifact[];
 }
 
+const FLAVORS: Record<ServerProtocolArtifact, 'ultra_keccak_honk' | 'ultra_honk'> = {
+  BaseParityArtifact: 'ultra_keccak_honk',
+  EmptyNestedArtifact: 'ultra_honk',
+  PrivateKernelEmptyArtifact: 'ultra_honk',
+  PublicKernelTailArtifact: 'ultra_honk',
+  RootParityArtifact: 'ultra_honk',
+  RootRollupArtifact: 'ultra_honk',
+  BlockMergeRollupArtifact: 'ultra_honk',
+  BlockRootRollupArtifact: 'ultra_honk',
+  MergeRollupArtifact: 'ultra_honk',
+  BaseRollupArtifact: 'ultra_honk',
+  PublicKernelAppLogicArtifact: 'ultra_honk',
+  PublicKernelSetupArtifact: 'ultra_honk',
+  PublicKernelTeardownArtifact: 'ultra_honk',
+};
+
 /**
  * Prover implementation that uses barretenberg native proving
  */
 export class BBNativeRollupProver implements ServerCircuitProver {
-  private verificationKeys: Map<ServerProtocolArtifact, Promise<VerificationKeyData>> = new Map<
-    ServerProtocolArtifact,
+  private verificationKeys = new Map<
+    `ultra${'_keccak_' | '_'}honk_${ServerProtocolArtifact}`,
     Promise<VerificationKeyData>
   >();
 
@@ -148,7 +165,7 @@ export class BBNativeRollupProver implements ServerCircuitProver {
     const { circuitOutput, proof } = await this.createRecursiveProof(
       inputs,
       'BaseParityArtifact',
-      RECURSIVE_PROOF_LENGTH,
+      KECCAK_PROOF_LENGTH,
       convertBaseParityInputsToWitnessMap,
       convertBaseParityOutputsFromWitnessMap,
     );
@@ -162,7 +179,7 @@ export class BBNativeRollupProver implements ServerCircuitProver {
       verificationKey.keyAsFields,
       getVKSiblingPath(ProtocolCircuitVkIndexes.BaseParityArtifact),
       circuitOutput,
-    );
+    ) as any;
   }
 
   /**
@@ -538,6 +555,7 @@ export class BBNativeRollupProver implements ServerCircuitProver {
       circuitType,
       Buffer.from(artifact.bytecode, 'base64'),
       outputWitnessFile,
+      FLAVORS[circuitType],
       logger.debug,
     );
 
@@ -885,14 +903,15 @@ export class BBNativeRollupProver implements ServerCircuitProver {
    * @returns The verification key data
    */
   private async getVerificationKeyDataForCircuit(circuitType: ServerProtocolArtifact): Promise<VerificationKeyData> {
-    let promise = this.verificationKeys.get(circuitType);
+    const flavor = FLAVORS[circuitType];
+    let promise = this.verificationKeys.get(`${flavor}_${circuitType}`);
     if (!promise) {
       promise = generateKeyForNoirCircuit(
         this.config.bbBinaryPath,
         this.config.bbWorkingDirectory,
         circuitType,
         ServerCircuitArtifacts[circuitType],
-        'vk',
+        flavor,
         logger.debug,
       ).then(result => {
         if (result.status === BB_RESULT.FAILURE) {
@@ -900,7 +919,7 @@ export class BBNativeRollupProver implements ServerCircuitProver {
         }
         return extractVkData(result.vkPath!);
       });
-      this.verificationKeys.set(circuitType, promise);
+      this.verificationKeys.set(`${flavor}_${circuitType}`, promise);
     }
     const vk = await promise;
     return vk.clone();
@@ -915,10 +934,11 @@ export class BBNativeRollupProver implements ServerCircuitProver {
     filePath: string,
     circuitType: ServerProtocolArtifact,
   ): Promise<VerificationKeyData> {
-    let promise = this.verificationKeys.get(circuitType);
+    const flavor = FLAVORS[circuitType];
+    let promise = this.verificationKeys.get(`${flavor}_${circuitType}`);
     if (!promise) {
       promise = extractVkData(filePath);
-      this.verificationKeys.set(circuitType, promise);
+      this.verificationKeys.set(`${flavor}_${circuitType}`, promise);
     }
     return promise;
   }
@@ -942,11 +962,15 @@ export class BBNativeRollupProver implements ServerCircuitProver {
       fs.readFile(proofFieldsFilename, { encoding: 'utf-8' }),
     ]);
     const json = JSON.parse(proofString);
-    const vkData = await this.verificationKeys.get(circuitType);
-    if (!vkData) {
-      throw new Error(`Invalid verification key for ${circuitType}`);
-    }
-    const numPublicInputs = vkData.numPublicInputs - AGGREGATION_OBJECT_LENGTH;
+    const vkData = await this.getVerificationKeyDataForCircuit(circuitType);
+    const hasAgg = !CIRCUITS_WITHOUT_AGGREGATION.has(circuitType);
+    const numPublicInputs = hasAgg ? vkData.numPublicInputs - AGGREGATION_OBJECT_LENGTH : vkData.numPublicInputs;
+    console.log({
+      numPublicInputs,
+      numPublicInputsFromVk: vkData.numPublicInputs,
+      hasAgg,
+      circuitType,
+    });
     const fieldsWithoutPublicInputs = json
       .slice(0, 3)
       .map(Fr.fromString)

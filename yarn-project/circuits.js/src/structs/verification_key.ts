@@ -1,7 +1,7 @@
 import { makeTuple } from '@aztec/foundation/array';
 import { times } from '@aztec/foundation/collection';
 import { Fq, Fr } from '@aztec/foundation/fields';
-import { BufferReader, type Tuple, serializeToBuffer } from '@aztec/foundation/serialize';
+import { BufferReader, serializeToBuffer } from '@aztec/foundation/serialize';
 
 import { VERIFICATION_KEY_LENGTH_IN_FIELDS } from '../constants.gen.js';
 import { CircuitType } from './shared.js';
@@ -83,7 +83,7 @@ export const CIRCUIT_RECURSIVE_INDEX = 0;
  * Provides a 'fields' representation of a circuit's verification key
  */
 export class VerificationKeyAsFields {
-  constructor(public key: Tuple<Fr, typeof VERIFICATION_KEY_LENGTH_IN_FIELDS>, public hash: Fr) {}
+  constructor(public key: Fr[], public hash: Fr) {}
 
   public get numPublicInputs() {
     return Number(this.key[CIRCUIT_PUBLIC_INPUTS_INDEX]);
@@ -102,10 +102,10 @@ export class VerificationKeyAsFields {
    * @returns The buffer.
    */
   toBuffer() {
-    return serializeToBuffer(this.key, this.hash);
+    return serializeToBuffer(...this.toFields());
   }
   toFields() {
-    return [...this.key, this.hash];
+    return [this.key.length, ...this.key, this.hash];
   }
 
   /**
@@ -115,7 +115,7 @@ export class VerificationKeyAsFields {
    */
   static fromBuffer(buffer: Buffer | BufferReader): VerificationKeyAsFields {
     const reader = BufferReader.asReader(buffer);
-    return new VerificationKeyAsFields(reader.readArray(VERIFICATION_KEY_LENGTH_IN_FIELDS, Fr), reader.readObject(Fr));
+    return new VerificationKeyAsFields(reader.readVector(Fr), reader.readObject(Fr));
   }
 
   /**

@@ -1543,7 +1543,7 @@ export function mapKernelDataToNoir(kernelData: KernelData): KernelDataNoir {
   };
 }
 
-export function mapVerificationKeyToNoir(key: VerificationKeyAsFields) {
+export function mapVerificationKeyToNoir(key: VerificationKeyAsFields): any {
   return {
     key: mapTuple(key.key, mapFieldToNoir),
     hash: mapFieldToNoir(key.hash),

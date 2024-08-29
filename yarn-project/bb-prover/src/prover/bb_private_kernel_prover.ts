@@ -301,7 +301,14 @@ export class BBNativePrivateKernelProver implements PrivateKernelProver {
 
     const timer = new Timer();
 
-    const vkResult = await computeVerificationKey(this.bbBinaryPath, directory, circuitType, bytecode, this.log.debug);
+    const vkResult = await computeVerificationKey(
+      this.bbBinaryPath,
+      directory,
+      circuitType,
+      bytecode,
+      'ultra_honk',
+      this.log.debug,
+    );
 
     if (vkResult.status === BB_RESULT.FAILURE) {
       this.log.error(`Failed to generate proof for ${circuitType}${dbgCircuitName}: ${vkResult.reason}`);
