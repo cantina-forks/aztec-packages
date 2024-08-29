@@ -85,8 +85,6 @@ template <IsRecursiveFlavor Flavor> class RecursiveVerifierInstance_ {
             relation_parameters.gamma = FF::from_witness(builder, instance->relation_parameters.gamma);
             relation_parameters.public_input_delta =
                 FF::from_witness(builder, instance->relation_parameters.public_input_delta);
-            relation_parameters.lookup_grand_product_delta =
-                FF::from_witness(builder, instance->relation_parameters.lookup_grand_product_delta);
         }
     }
 
@@ -142,8 +140,6 @@ template <IsRecursiveFlavor Flavor> class RecursiveVerifierInstance_ {
         inst.relation_parameters.beta = relation_parameters.beta.get_value();
         inst.relation_parameters.gamma = relation_parameters.gamma.get_value();
         inst.relation_parameters.public_input_delta = relation_parameters.public_input_delta.get_value();
-        inst.relation_parameters.lookup_grand_product_delta =
-            relation_parameters.lookup_grand_product_delta.get_value();
         return inst;
     }
 };

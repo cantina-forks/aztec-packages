@@ -127,8 +127,6 @@ std::shared_ptr<typename VerifierInstances::Instance> ProtoGalaxyRecursiveVerifi
         expected_parameters.gamma += instance->relation_parameters.gamma * lagranges[inst_idx];
         expected_parameters.public_input_delta +=
             instance->relation_parameters.public_input_delta * lagranges[inst_idx];
-        expected_parameters.lookup_grand_product_delta +=
-            instance->relation_parameters.lookup_grand_product_delta * lagranges[inst_idx];
     }
     return next_accumulator;
 }
