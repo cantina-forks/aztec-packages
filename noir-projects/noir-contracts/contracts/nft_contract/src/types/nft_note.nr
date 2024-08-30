@@ -88,15 +88,10 @@ impl NFTNoteHidingPoint {
             unsafe_rand()
         };
         let note = NFTNote {
-            header: NoteHeader {
-                contract_address: AztecAddress::zero(),
-                nonce: 0,
-                storage_slot,
-                note_hash_counter: 0
-            },
+            header: NoteHeader { contract_address: AztecAddress::zero(), nonce: 0, storage_slot, note_hash_counter: 0 },
             token_id: 0,
             npk_m_hash,
-            randomness,
+            randomness
         };
         Self { inner: note.compute_note_hiding_point() }
     }

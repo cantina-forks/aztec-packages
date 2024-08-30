@@ -44,7 +44,7 @@ contract NFT {
 
     #[aztec(public)]
     #[aztec(initializer)]
-    fn constructor(admin: AztecAddress, name: str<31>, symbol: str<31>, decimals: u8) {
+    fn constructor(admin: AztecAddress, name: str<31>, symbol: str<31>) {
         assert(!admin.is_zero(), "invalid admin");
         storage.admin.write(admin);
         storage.minters.at(admin).write(true);
@@ -54,19 +54,19 @@ contract NFT {
 
     #[aztec(public)]
     fn set_admin(new_admin: AztecAddress) {
-        assert(storage.admin.read().eq(context.msg_sender()), "caller is not admin");
+        assert(storage.admin.read().eq(context.msg_sender()), "caller is not an admin");
         storage.admin.write(new_admin);
     }
 
     #[aztec(public)]
     fn set_minter(minter: AztecAddress, approve: bool) {
-        assert(storage.admin.read().eq(context.msg_sender()), "caller is not admin");
+        assert(storage.admin.read().eq(context.msg_sender()), "caller is not an admin");
         storage.minters.at(minter).write(approve);
     }
 
     #[aztec(public)]
-    fn mint_public(to: AztecAddress, token_id: Field) {
-        assert(storage.minters.at(context.msg_sender()).read(), "caller is not minter");
+    fn mint(to: AztecAddress, token_id: Field) {
+        assert(storage.minters.at(context.msg_sender()).read(), "caller is not a minter");
         assert(storage.nft_exists.at(token_id).read() == false, "token already exists");
 
         storage.nft_exists.at(token_id).write(true);
@@ -125,7 +125,12 @@ contract NFT {
     }
 
     #[aztec(private)]
-    fn prepare_shield(shield_owner: AztecAddress, token_id: Field, finalizer: AztecAddress, nonce: Field) {
+    fn prepare_shield(
+        shield_owner: AztecAddress,
+        token_id: Field,
+        finalizer: AztecAddress,
+        nonce: Field
+    ) {
         if (!shield_owner.eq(context.msg_sender())) {
             assert_current_call_valid_authwit(&mut context, shield_owner);
         } else {
