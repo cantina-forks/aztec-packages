@@ -81,14 +81,7 @@ describe('full_prover', () => {
         }
         // TODO(#6624): Note that with honk proofs the below writes incorrect test data to file.
         // The serialisation does not account for the prepended fields (circuit size, PI size, PI offset) in new Honk proofs, so the written data is shifted.
-        writeTestData(
-          'yarn-project/end-to-end/src/fixtures/dumps/block_result.json',
-          JSON.stringify({
-            block: blockResult.block.toString(),
-            proof: blockResult.proof.toString(),
-            aggregationObject: blockResult.aggregationObject.map((x: Fr) => x.toString()),
-          }),
-        );
+        writeTestData('yarn-project/end-to-end/src/fixtures/dumps/block_result.json', JSON.stringify(blockResult));
       }
     },
     TIMEOUT,

@@ -313,7 +313,7 @@ export class BBNativePrivateKernelProver implements PrivateKernelProver {
       directory,
       circuitType,
       bytecode,
-      'ultra_honk',
+      circuitType === 'App' ? 'ultra_honk' : getUltraHonkFlavorForCircuit(circuitType),
       this.log.debug,
     );
 

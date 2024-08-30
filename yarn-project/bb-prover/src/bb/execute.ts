@@ -125,7 +125,7 @@ export async function generateKeyForNoirCircuit(
   // The bytecode hash file is also written here as /workingDirectory/pk/BaseParityArtifact/bytecode-hash
   // The bytecode is written to e.g. /workingDirectory/pk/BaseParityArtifact/bytecode
   // The bytecode is removed after the key is generated, leaving just the hash file
-  const circuitOutputDirectory = `${workingDirectory}/${flavor}/vk/${circuitName}`;
+  const circuitOutputDirectory = `${workingDirectory}/vk/${circuitName}`;
   const outputPath = `${circuitOutputDirectory}`;
   const bytecodeHash = sha256(bytecode);
 
@@ -277,7 +277,7 @@ export async function computeVerificationKey(
   const bytecodePath = `${workingDirectory}/${circuitName}-bytecode`;
 
   // The verification key is written to this path
-  const outputPath = `${workingDirectory}/${flavor}/vk`;
+  const outputPath = `${workingDirectory}/vk`;
 
   const binaryPresent = await fs
     .access(pathToBB, fs.constants.R_OK)
@@ -296,7 +296,7 @@ export async function computeVerificationKey(
     };
     let result = await executeBB(
       pathToBB,
-      'write_vk_ultra_honk',
+      `write_vk_${flavor}`,
       ['-o', outputPath, '-b', bytecodePath, '-v'],
       logFunction,
     );
@@ -360,8 +360,7 @@ export async function generateProof(
   const bytecodePath = `${workingDirectory}/${circuitName}-bytecode`;
 
   // The proof is written to e.g. /workingDirectory/ultra_honk/proof
-  const outputPath = `${workingDirectory}/${flavor}`;
-  await fs.mkdir(outputPath, { recursive: true });
+  const outputPath = `${workingDirectory}`;
 
   const binaryPresent = await fs
     .access(pathToBB, fs.constants.R_OK)
