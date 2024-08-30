@@ -2,7 +2,7 @@ use dep::aztec::{
     generators::{Ga1 as G_tid, Ga2 as G_npk, Ga3 as G_rnd, G_slot},
     note::{note_getter_options::PropertySelector, utils::compute_note_hash_for_nullify},
     keys::getters::get_nsk_app, oracle::unsafe_rand::unsafe_rand,
-    prelude::{NoteInterface, NoteHeader, PrivateContext},
+    prelude::{AztecAddress, NoteInterface, NoteHeader, PrivateContext},
     protocol_types::{
     constants::GENERATOR_INDEX__NOTE_NULLIFIER, point::{Point, POINT_LENGTH},
     hash::poseidon2_hash_with_separator, traits::{Empty, Eq, Deserialize, Serialize}
@@ -83,8 +83,21 @@ struct NFTNoteHidingPoint {
 }
 
 impl NFTNoteHidingPoint {
-    fn new(npk_m_hash: Field) -> Self {
-        let note = NFTNote::new(0, npk_m_hash);
+    fn new(npk_m_hash: Field, storage_slot: Field) -> Self {
+        let randomness = unsafe {
+            unsafe_rand()
+        };
+        let note = NFTNote {
+            header: NoteHeader {
+                contract_address: AztecAddress::zero(),
+                nonce: 0,
+                storage_slot,
+                note_hash_counter: 0
+            },
+            token_id: 0,
+            npk_m_hash,
+            randomness,
+        };
         Self { inner: note.compute_note_hiding_point() }
     }
 

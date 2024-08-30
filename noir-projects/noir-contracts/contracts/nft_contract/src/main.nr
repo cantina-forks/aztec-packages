@@ -125,15 +125,16 @@ contract NFT {
     }
 
     #[aztec(private)]
-    fn prepare_shield(from: AztecAddress, token_id: Field, finalizer: AztecAddress, nonce: Field) {
-        if (!from.eq(context.msg_sender())) {
-            assert_current_call_valid_authwit(&mut context, from);
+    fn prepare_shield(shield_owner: AztecAddress, token_id: Field, finalizer: AztecAddress, nonce: Field) {
+        if (!shield_owner.eq(context.msg_sender())) {
+            assert_current_call_valid_authwit(&mut context, shield_owner);
         } else {
             assert(nonce == 0, "invalid nonce");
         }
         // We create a partial NFT note with unpopulated/zero token id
-        let from_npk_m_hash = get_current_public_keys(&mut context, from).npk_m.hash();
-        let hiding_point = NFTNoteHidingPoint::new(from_npk_m_hash);
+        let shield_owner_npk_m_hash = get_current_public_keys(&mut context, shield_owner).npk_m.hash();
+        let shield_note_slot = storage.private_nfts.at(shield_owner).storage_slot;
+        let hiding_point = NFTNoteHidingPoint::new(shield_owner_npk_m_hash, shield_note_slot);
         NFT::at(context.this_address()).set_transient_storage(hiding_point, finalizer).enqueue(&mut context);
     }
 
