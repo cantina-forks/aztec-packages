@@ -119,15 +119,17 @@ contract NFT {
         storage.public_owners.at(token_id).write(to);
     }
 
-    #[aztec(public)]
-    fn shield(from: AztecAddress, token_id: Field, secret_hash: Field, nonce: Field) {
+    #[aztec(private)]
+    fn shield(from: AztecAddress, token_id: Field, finalizer: AztecAddress, nonce: Field) {
         if (!from.eq(context.msg_sender())) {
-            // The redeem is only spendable once, so we need to ensure that you cannot insert multiple shields from the same message.
-            assert_current_call_valid_authwit_public(&mut context, from);
+            assert_current_call_valid_authwit(&mut context, from);
         } else {
             assert(nonce == 0, "invalid nonce");
         }
-        // ...
+        // We create a partial NFT note with unpopulated/zero token id
+        let token_id = 0;
+        let from_npk_m_hash = get_current_public_keys(&mut context, from).npk_m.hash();
+        let partial_note = NFTNote::new(token_id, from_npk_m_hash);
     }
 
     /**
