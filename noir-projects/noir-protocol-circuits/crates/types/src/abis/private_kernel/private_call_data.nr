@@ -1,7 +1,6 @@
 use crate::{
     abis::{
     private_call_stack_item::PrivateCallStackItem,
-    private_circuit_public_inputs::PrivateCircuitPublicInputs
 },
     address::{SaltedInitializationHash, PublicKeysHash, EthAddress}, constants::FUNCTION_TREE_HEIGHT,
     contract_class_id::ContractClassId, merkle_tree::membership::MembershipWitness,

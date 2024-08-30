@@ -18,6 +18,7 @@ use crate::{
     utils::reader::Reader
 };
 
+// Public inputs to public app circuit.
 struct PublicCircuitPublicInputs {
     call_context: CallContext,
 
@@ -52,7 +53,7 @@ struct PublicCircuitPublicInputs {
     prover_address: AztecAddress,
 
     revert_code: u8,
-    
+
     start_gas_left: Gas,
     end_gas_left: Gas,
     transaction_fee: Field,

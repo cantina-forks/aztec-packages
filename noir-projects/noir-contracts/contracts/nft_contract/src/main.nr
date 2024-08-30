@@ -24,8 +24,6 @@ contract NFT {
         nft_exists: Map<Field, PublicMutable<bool>>,
         // A map from token ID to the public owner of the NFT.
         public_owners: Map<Field, PublicMutable<AztecAddress>>,
-        // Contains the NFTs that are waiting to be shielded.
-        pending_shields: PrivateSet<TransparentNote>,
     }
 
     #[aztec(public)]
@@ -53,18 +51,11 @@ contract NFT {
     #[aztec(public)]
     fn mint_public(to: AztecAddress, token_id: Field) {
         assert(storage.minters.at(context.msg_sender()).read(), "caller is not minter");
-        // assert the token_id does not exist yet and mint
-        ...
-    }
+        assert(storage.nft_exists.at(token_id).read() == false, "token already exists");
 
-    #[aztec(public)]
-    fn mint_private(token_id: Field, secret_hash: Field) {
-        assert(storage.minters.at(context.msg_sender()).read(), "caller is not minter");
-        let pending_shields = storage.pending_shields;
-        let mut note = TransparentNote::new(token_id, secret_hash);
-        pending_shields.insert_from_public(&mut note);
-        // set that the nft exists
-        ...
+        storage.nft_exists.at(token_id).write(true);
+
+        storage.public_owners.at(token_id).write(to);
     }
 
     #[aztec(public)]
@@ -111,7 +102,10 @@ contract NFT {
             assert(nonce == 0, "invalid nonce");
         }
 
-        ...
+        let public_owner = storage.public_owners.at(token_id).read();
+        assert(public_owner.eq(from), "invalid owner");
+
+        storage.public_owners.at(token_id).write(to);
     }
 
     #[aztec(public)]
@@ -127,30 +121,26 @@ contract NFT {
     }
 
     #[aztec(private)]
-    fn transfer(to: AztecAddress, token_id: Field) {
-        ...
-    }
-
-    #[aztec(private)]
     fn transfer_from(from: AztecAddress, to: AztecAddress, token_id: Field, nonce: Field) {
-        ...
-    }
-
-    // Burns public NFT
-    #[aztec(public)]
-    fn burn(from: AztecAddress, amount: Field, nonce: Field) {
-        // docs:start:assert_current_call_valid_authwit_public
         if (!from.eq(context.msg_sender())) {
-            assert_current_call_valid_authwit_public(&mut context, from);
+            assert_current_call_valid_authwit(&mut context, from);
         } else {
             assert(nonce == 0, "invalid nonce");
         }
-        ...
-    }
 
-    #[aztec(private)]
-    fn redeem_shield(to: AztecAddress, amount: Field, secret: Field) {
-        ...
+        let nfts = storage.private_nfts;
+
+        let mut options = NoteGetterOptions::new();
+        options = options.select(NFTNote::properties().token_id, token_id, Option::none()).set_limit(1);
+        let notes = nfts.at(from).pop_notes(options);
+        assert(notes.len() == 1, "NFT not found");
+
+        let from_ovpk_m = get_current_public_keys(&mut context, from).ovpk_m;
+        let to_keys = get_current_public_keys(&mut context, to);
+
+        let note = NFTNote::new(token_id, to_keys.npk_m.hash());
+        nfts.at(to).insert(note).emit(encode_and_encrypt_note_with_keys(context, from_ovpk_m, to_keys.ivpk_m, to));
+
     }
 
     #[aztec(private)]
@@ -170,13 +160,13 @@ contract NFT {
         storage.public_owners.at(token_id).read()
     }
 
-    // Returns the total number of NFTs a given address owns in private.
-    unconstrained fn balance_of_private(owner: AztecAddress) -> pub Field {
-        ...
-    }
+    // // Returns the total number of NFTs a given address owns in private.
+    // unconstrained fn balance_of_private(owner: AztecAddress) -> pub Field {
+    //     ...
+    // }
 
-    unconstrained fn token_uri(token_id: Field) -> pub str<URI_LENGTH> {
-        // concatenate the base URI with the token ID and return it
-        ...
-    }
+    // unconstrained fn token_uri(token_id: Field) -> pub str<URI_LENGTH> {
+    //     // concatenate the base URI with the token ID and return it
+    //     ...
+    // }
 }
