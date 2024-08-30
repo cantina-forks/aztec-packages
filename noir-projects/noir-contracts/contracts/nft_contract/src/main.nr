@@ -133,8 +133,8 @@ contract NFT {
         }
         // We create a partial NFT note with unpopulated/zero token id
         let from_npk_m_hash = get_current_public_keys(&mut context, from).npk_m.hash();
-        let partial_note_point = NFTNoteHidingPoint::new(from_npk_m_hash);
-        NFT::at(context.this_address()).set_transient_storage(partial_note_point, finalizer).enqueue(&mut context);
+        let hiding_point = NFTNoteHidingPoint::new(from_npk_m_hash);
+        NFT::at(context.this_address()).set_transient_storage(hiding_point, finalizer).enqueue(&mut context);
     }
 
     #[aztec(public)]
@@ -150,11 +150,32 @@ contract NFT {
     }
 
     #[aztec(public)]
-    fn send_to_partial_note() {
-        let partial_note_point: NFTNoteHidingPoint = context.storage_read(POINT_TRANSIENT_STORAGE_SLOT);
-        let expected_finalizer: AztecAddress = context.storage_read(FINALIZER_TRANSIENT_STORAGE_SLOT);
+    fn send_to_shield(from: AztecAddress, token_id: Field, nonce: Field) {
+        // Perform authwit, owner and finalizer checks
+        if (!from.eq(context.msg_sender())) {
+            assert_current_call_valid_authwit_public(&mut context, from);
+        } else {
+            assert(nonce == 0, "invalid nonce");
+        }
 
-        // We reset the values to zero to achieve the effect of transient storage - kernels will squash the writes
+        let current_owner = storage.public_owners.at(token_id).read();
+        assert(current_owner.eq(from), "invalid NFT owner");
+
+        let expected_finalizer: AztecAddress = context.storage_read(FINALIZER_TRANSIENT_STORAGE_SLOT);
+        assert(expected_finalizer.eq(from), "invalid finalizer");
+
+        // Set the original NFT owner to zero
+        storage.public_owners.at(token_id).write(AztecAddress::zero());
+
+        // Read the NFT hiding point from "transient" storage and add the token ID to it
+        let mut hiding_point: NFTNoteHidingPoint = context.storage_read(POINT_TRANSIENT_STORAGE_SLOT);
+        hiding_point.add_token_id(token_id);
+
+        // Insert the finalized note
+        let note_hash = hiding_point.finalize();
+        context.push_note_hash(note_hash);
+
+        // At last we reset the values to zero to achieve the effect of transient storage - kernels will squash the writes
         context.storage_write(POINT_TRANSIENT_STORAGE_SLOT, NFTNoteHidingPoint::empty());
         context.storage_write(FINALIZER_TRANSIENT_STORAGE_SLOT, AztecAddress::zero());
     }
