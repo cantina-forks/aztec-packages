@@ -5,7 +5,7 @@ use dep::aztec::{
     prelude::{NoteInterface, NoteHeader, PrivateContext},
     protocol_types::{
     constants::GENERATOR_INDEX__NOTE_NULLIFIER, point::{Point, POINT_LENGTH},
-    hash::poseidon2_hash_with_separator, traits::Serialize
+    hash::poseidon2_hash_with_separator, traits::{Empty, Eq, Deserialize, Serialize}
 }
 };
 use std::{embedded_curve_ops::multi_scalar_mul, hash::from_field_unsafe};
@@ -24,10 +24,6 @@ struct NFTNote {
     npk_m_hash: Field,
     // Randomness of the note to hide its contents
     randomness: Field,
-}
-
-struct NFTNoteProperties {
-    token_id: PropertySelector,
 }
 
 impl NoteInterface<NFT_NOTE_LEN, NFT_NOTE_BYTES_LEN> for NFTNote {
@@ -73,15 +69,6 @@ impl NFTNote {
         };
         NFTNote { token_id, npk_m_hash, randomness, header: NoteHeader::empty() }
     }
-
-    pub fn properties() -> NFTNoteProperties {
-        NFTNoteProperties { token_id: PropertySelector { index: 0, offset: 0, length: 32 } }
-    }
-
-    // TODO(#8290): Merge this func with `compute_note_hiding_point`
-    fn to_note_hiding_point(self) -> NFTNoteHidingPoint {
-        NFTNoteHidingPoint::new(self.compute_note_hiding_point())
-    }
 }
 
 impl Eq for NFTNote {
@@ -96,24 +83,13 @@ struct NFTNoteHidingPoint {
 }
 
 impl NFTNoteHidingPoint {
-    fn new(point: Point) -> Self {
-        Self { inner: point }
+    fn new(npk_m_hash: Field) -> Self {
+        let note = NFTNote::new(0, npk_m_hash);
+        Self { inner: note.compute_note_hiding_point() }
     }
 
     fn add_token_id(&mut self, token_id: Field) {
         self.inner = multi_scalar_mul([G_tid], [from_field_unsafe(token_id)]) + self.inner;
-    }
-
-    fn add_npk_m_hash(&mut self, npk_m_hash: Field) {
-        self.inner = multi_scalar_mul([G_npk], [from_field_unsafe(npk_m_hash)]) + self.inner;
-    }
-
-    fn add_randomness(&mut self, randomness: Field) {
-        self.inner = multi_scalar_mul([G_rnd], [from_field_unsafe(randomness)]) + self.inner;
-    }
-
-    fn add_slot(&mut self, slot: Field) {
-        self.inner = multi_scalar_mul([G_slot], [from_field_unsafe(slot)]) + self.inner;
     }
 
     fn finalize(self) -> Field {
@@ -124,5 +100,25 @@ impl NFTNoteHidingPoint {
 impl Serialize<POINT_LENGTH> for NFTNoteHidingPoint {
     fn serialize(self) -> [Field; POINT_LENGTH] {
         self.inner.serialize()
+    }
+}
+
+impl Deserialize<POINT_LENGTH> for NFTNoteHidingPoint {
+    fn deserialize(serialized: [Field; POINT_LENGTH]) -> NFTNoteHidingPoint {
+        NFTNoteHidingPoint {inner: Point::deserialize(serialized)}
+    }
+}
+
+impl Empty for NFTNoteHidingPoint {
+    fn empty() -> Self {
+        Self {
+            inner: Point::empty()
+        }
+    }
+}
+
+impl Eq for NFTNoteHidingPoint {
+    fn eq(self, other: Self) -> bool {
+        self.inner == other.inner
     }
 }

@@ -7,13 +7,18 @@ contract NFT {
     use dep::aztec::{
         prelude::{NoteGetterOptions, Map, PublicMutable, SharedImmutable, PrivateSet, AztecAddress},
         encrypted_logs::{encrypted_note_emission::encode_and_encrypt_note_with_keys},
-        keys::getters::get_current_public_keys
+        keys::getters::get_current_public_keys, protocol_types::traits::is_empty
     };
     use dep::authwit::auth::{assert_current_call_valid_authwit, assert_current_call_valid_authwit_public, compute_authwit_nullifier};
-    use crate::types::nft_note::NFTNote;
+    use crate::types::nft_note::{NFTNote, NFTNoteHidingPoint};
 
+    global POINT_TRANSIENT_STORAGE_SLOT = 6000;
+    global FINALIZER_TRANSIENT_STORAGE_SLOT = 7000;
+
+    // TODO: Rename this to Transfer - calling this Transfer2 to avoid export conflict with the Transfer event in
+    // the Token contract
     #[aztec(event)]
-    struct Transfer {
+    struct Transfer2 {
         from: AztecAddress,
         to: AztecAddress,
         token_id: Field,
@@ -120,16 +125,38 @@ contract NFT {
     }
 
     #[aztec(private)]
-    fn shield(from: AztecAddress, token_id: Field, finalizer: AztecAddress, nonce: Field) {
+    fn prepare_shield(from: AztecAddress, token_id: Field, finalizer: AztecAddress, nonce: Field) {
         if (!from.eq(context.msg_sender())) {
             assert_current_call_valid_authwit(&mut context, from);
         } else {
             assert(nonce == 0, "invalid nonce");
         }
         // We create a partial NFT note with unpopulated/zero token id
-        let token_id = 0;
         let from_npk_m_hash = get_current_public_keys(&mut context, from).npk_m.hash();
-        let partial_note = NFTNote::new(token_id, from_npk_m_hash);
+        let partial_note_point = NFTNoteHidingPoint::new(from_npk_m_hash);
+        NFT::at(context.this_address()).set_transient_storage(partial_note_point, finalizer).enqueue(&mut context);
+    }
+
+    #[aztec(public)]
+    #[aztec(internal)]
+    fn set_transient_storage(point: NFTNoteHidingPoint, finalizer: AztecAddress) {
+        let previous_point_value: NFTNoteHidingPoint = context.storage_read(POINT_TRANSIENT_STORAGE_SLOT);
+        let previous_finalizer: AztecAddress = context.storage_read(FINALIZER_TRANSIENT_STORAGE_SLOT);
+        assert(is_empty(previous_point_value), "non-zero point transient storage");
+        assert(previous_finalizer.is_zero(), "non-zero finalizer transient storage");
+
+        context.storage_write(POINT_TRANSIENT_STORAGE_SLOT, point);
+        context.storage_write(FINALIZER_TRANSIENT_STORAGE_SLOT, finalizer);
+    }
+
+    #[aztec(public)]
+    fn send_to_partial_note() {
+        let partial_note_point: NFTNoteHidingPoint = context.storage_read(POINT_TRANSIENT_STORAGE_SLOT);
+        let expected_finalizer: AztecAddress = context.storage_read(FINALIZER_TRANSIENT_STORAGE_SLOT);
+
+        // We reset the values to zero to achieve the effect of transient storage - kernels will squash the writes
+        context.storage_write(POINT_TRANSIENT_STORAGE_SLOT, NFTNoteHidingPoint::empty());
+        context.storage_write(FINALIZER_TRANSIENT_STORAGE_SLOT, AztecAddress::zero());
     }
 
     /**
