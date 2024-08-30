@@ -58,6 +58,7 @@ import {
   verifyProof,
 } from '../bb/execute.js';
 import { type BBConfig } from '../config.js';
+import { type UltraHonkFlavor, getUltraHonkFlavorForCircuit } from '../honk.js';
 import { mapProtocolArtifactNameToCircuitName } from '../stats.js';
 import { extractVkData } from '../verification_key/verification_key_data.js';
 
@@ -213,7 +214,12 @@ export class BBNativePrivateKernelProver implements PrivateKernelProver {
       this.log.debug(`${circuitType} BB out - ${message}`);
     };
 
-    const result = await this.verifyProofFromKey(verificationKey.keyAsBytes, proof, logFunction);
+    const result = await this.verifyProofFromKey(
+      getUltraHonkFlavorForCircuit(circuitType),
+      verificationKey.keyAsBytes,
+      proof,
+      logFunction,
+    );
 
     if (result.status === BB_RESULT.FAILURE) {
       const errorMessage = `Failed to verify ${circuitType} proof!`;
@@ -224,6 +230,7 @@ export class BBNativePrivateKernelProver implements PrivateKernelProver {
   }
 
   private async verifyProofFromKey(
+    flavor: UltraHonkFlavor,
     verificationKey: Buffer,
     proof: Proof,
     logFunction: (message: string) => void = () => {},
@@ -234,7 +241,7 @@ export class BBNativePrivateKernelProver implements PrivateKernelProver {
 
       await fs.writeFile(proofFileName, proof.buffer);
       await fs.writeFile(verificationKeyPath, verificationKey);
-      return await verifyProof(this.bbBinaryPath, proofFileName, verificationKeyPath!, logFunction);
+      return await verifyProof(this.bbBinaryPath, proofFileName, verificationKeyPath!, flavor, logFunction);
     };
     return await this.runInDirectory(operation);
   }

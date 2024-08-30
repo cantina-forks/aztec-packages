@@ -8,6 +8,8 @@ import * as proc from 'child_process';
 import * as fs from 'fs/promises';
 import { basename, dirname, join } from 'path';
 
+import { type UltraHonkFlavor } from '../honk.js';
+
 export const VK_FILENAME = 'vk';
 export const VK_FIELDS_FILENAME = 'vk_fields.json';
 export const PROOF_FILENAME = 'proof';
@@ -113,7 +115,7 @@ export async function generateKeyForNoirCircuit(
   workingDirectory: string,
   circuitName: string,
   compiledCircuit: NoirCompiledCircuit,
-  flavor: 'ultra_honk' | 'ultra_keccak_honk',
+  flavor: UltraHonkFlavor,
   log: LogFn,
   force = false,
 ): Promise<BBSuccess | BBFailure> {
@@ -261,7 +263,7 @@ export async function computeVerificationKey(
   workingDirectory: string,
   circuitName: string,
   bytecode: Buffer,
-  flavor: 'ultra_honk' | 'ultra_keccak_honk',
+  flavor: UltraHonkFlavor,
   log: LogFn,
 ): Promise<BBFailure | BBSuccess> {
   // Check that the working directory exists
@@ -344,7 +346,7 @@ export async function generateProof(
   circuitName: string,
   bytecode: Buffer,
   inputWitnessFile: string,
-  flavor: 'ultra_honk' | 'ultra_keccak_honk',
+  flavor: UltraHonkFlavor,
   log: LogFn,
 ): Promise<BBFailure | BBSuccess> {
   // Check that the working directory exists
@@ -602,9 +604,10 @@ export async function verifyProof(
   pathToBB: string,
   proofFullPath: string,
   verificationKeyPath: string,
+  ultraHonkFlavor: UltraHonkFlavor,
   log: LogFn,
 ): Promise<BBFailure | BBSuccess> {
-  return await verifyProofInternal(pathToBB, proofFullPath, verificationKeyPath, 'verify_ultra_keccak_honk', log);
+  return await verifyProofInternal(pathToBB, proofFullPath, verificationKeyPath, `verify_${ultraHonkFlavor}`, log);
 }
 
 /**
