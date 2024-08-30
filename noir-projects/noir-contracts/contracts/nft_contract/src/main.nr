@@ -1,6 +1,17 @@
+mod types;
+
 // Minimal NFT implementation with `AuthWit` support that allows minting in public-only and transfers in both public
 // and private.
 contract NFT {
+    use dep::compressed_string::FieldCompressedString;
+    use dep::aztec::{
+        prelude::{NoteGetterOptions, Map, PublicMutable, SharedImmutable, PrivateSet, AztecAddress},
+        encrypted_logs::{encrypted_note_emission::encode_and_encrypt_note_with_keys},
+        keys::getters::get_current_public_keys
+    };
+    use dep::authwit::auth::{assert_current_call_valid_authwit, assert_current_call_valid_authwit_public, compute_authwit_nullifier};
+    use crate::types::nft_note::NFTNote;
+
     #[aztec(event)]
     struct Transfer {
         from: AztecAddress,
@@ -19,7 +30,7 @@ contract NFT {
         // Addresses that can mint
         minters: Map<AztecAddress, PublicMutable<bool>>,
         // Contains the NFTs owned by each address in private.
-        private_nfts: Map<AztecAddress, PrivateSet<NFTNote>>
+        private_nfts: Map<AztecAddress, PrivateSet<NFTNote>>,
         // A map from token ID to a boolean indicating if the NFT exists.
         nft_exists: Map<Field, PublicMutable<bool>>,
         // A map from token ID to the public owner of the NFT.
@@ -116,8 +127,18 @@ contract NFT {
         } else {
             assert(nonce == 0, "invalid nonce");
         }
+        // ...
+    }
 
-        ...
+    /**
+     * Cancel a private authentication witness.
+     * @param inner_hash The inner hash of the authwit to cancel.
+     */
+    #[aztec(private)]
+    fn cancel_authwit(inner_hash: Field) {
+        let on_behalf_of = context.msg_sender();
+        let nullifier = compute_authwit_nullifier(on_behalf_of, inner_hash);
+        context.push_nullifier(nullifier);
     }
 
     #[aztec(private)]
@@ -139,8 +160,7 @@ contract NFT {
         let to_keys = get_current_public_keys(&mut context, to);
 
         let note = NFTNote::new(token_id, to_keys.npk_m.hash());
-        nfts.at(to).insert(note).emit(encode_and_encrypt_note_with_keys(context, from_ovpk_m, to_keys.ivpk_m, to));
-
+        nfts.at(to).insert(&mut note).emit(encode_and_encrypt_note_with_keys(&mut context, from_ovpk_m, to_keys.ivpk_m, to));
     }
 
     #[aztec(private)]
@@ -150,7 +170,7 @@ contract NFT {
         } else {
             assert(nonce == 0, "invalid nonce");
         }
-        ...
+        // ...
     }
 
     // Returns zero address when the token does not have public owner. Reverts if the token does not exist.
@@ -159,12 +179,10 @@ contract NFT {
     fn owner_of(token_id: Field) -> AztecAddress {
         storage.public_owners.at(token_id).read()
     }
-
     // // Returns the total number of NFTs a given address owns in private.
     // unconstrained fn balance_of_private(owner: AztecAddress) -> pub Field {
     //     ...
     // }
-
     // unconstrained fn token_uri(token_id: Field) -> pub str<URI_LENGTH> {
     //     // concatenate the base URI with the token ID and return it
     //     ...

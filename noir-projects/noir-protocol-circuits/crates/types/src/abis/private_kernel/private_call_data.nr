@@ -1,7 +1,5 @@
 use crate::{
-    abis::{
-    private_call_stack_item::PrivateCallStackItem,
-},
+    abis::{private_call_stack_item::PrivateCallStackItem},
     address::{SaltedInitializationHash, PublicKeysHash, EthAddress}, constants::FUNCTION_TREE_HEIGHT,
     contract_class_id::ContractClassId, merkle_tree::membership::MembershipWitness,
     recursion::{verification_key::VerificationKey, proof::RecursiveProof, traits::Verifiable}

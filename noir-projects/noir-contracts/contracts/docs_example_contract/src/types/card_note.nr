@@ -1,6 +1,6 @@
 use dep::aztec::{
-    prelude::{NoteInterface, NoteHeader, PrivateContext},
-    note::{utils::compute_note_hash_for_nullify}, keys::getters::get_nsk_app,
+    prelude::{NoteInterface, NoteHeader, PrivateContext}, note::{utils::compute_note_hash_for_nullify},
+    keys::getters::get_nsk_app,
     protocol_types::{
     traits::{Eq, Serialize}, constants::GENERATOR_INDEX__NOTE_NULLIFIER,
     hash::poseidon2_hash_with_separator

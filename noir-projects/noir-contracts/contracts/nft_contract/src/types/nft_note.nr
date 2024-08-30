@@ -1,11 +1,8 @@
 use dep::aztec::{
+    note::{note_getter_options::PropertySelector, utils::compute_note_hash_for_nullify},
+    keys::getters::get_nsk_app, oracle::unsafe_rand::unsafe_rand,
     prelude::{NoteInterface, NoteHeader, PrivateContext},
-    note::{utils::compute_note_hash_for_nullify}, keys::getters::get_nsk_app,
-    protocol_types::{
-    constants::GENERATOR_INDEX__NOTE_NULLIFIER,
-    hash::poseidon2_hash_with_separator,
-    oracle::unsafe_rand::unsafe_rand
-}
+    protocol_types::{constants::GENERATOR_INDEX__NOTE_NULLIFIER, hash::poseidon2_hash_with_separator}
 };
 
 // Shows how to create a custom note
@@ -52,18 +49,17 @@ impl NoteInterface<NFT_NOTE_LEN, NFT_NOTE_BYTES_LEN> for NFTNote {
 }
 
 impl NFTNote {
-    pub new(token_id: Field, npk_m_hash: Field) -> Self {
-        NFTNote {
-            token_id,
-            npk_m_hash,
-            randomness: unsafe_rand(),
-            header: NoteHeader::empty(),
-        }
+    pub fn new(token_id: Field, npk_m_hash: Field) -> Self {
+        NFTNote { token_id, npk_m_hash, randomness: unsafe_rand(), header: NoteHeader::empty() }
     }
 
     pub fn properties() -> NFTNoteProperties {
-        NFTNoteProperties {
-            token_id: PropertySelector { index: 0, offset: 0, length: 32 },
-        }
+        NFTNoteProperties { token_id: PropertySelector { index: 0, offset: 0, length: 32 } }
+    }
+}
+
+impl Eq for NFTNote {
+    fn eq(self, other: Self) -> bool {
+        (self.token_id == other.token_id) & (self.npk_m_hash == other.npk_m_hash) & (self.randomness == other.randomness)
     }
 }
