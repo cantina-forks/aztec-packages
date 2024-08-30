@@ -265,6 +265,7 @@ fn handle_foreign_call(
         "avmOpcodeGetContractInstance" => {
             handle_get_contract_instance(avm_instrs, destinations, inputs);
         }
+        "avmOpcodeCalldataCopy" => handle_calldata_copy(avm_instrs, destinations, inputs),
         "avmOpcodeStorageRead" => handle_storage_read(avm_instrs, destinations, inputs),
         "avmOpcodeStorageWrite" => handle_storage_write(avm_instrs, destinations, inputs),
         "debugLog" => handle_debug_log(avm_instrs, destinations, inputs),
@@ -969,6 +970,44 @@ fn handle_debug_log(
             AvmOperand::U32 { value: fields_offset_ptr },
             // indirect
             AvmOperand::U32 { value: fields_size_ptr },
+        ],
+        ..Default::default()
+    });
+}
+
+// #[oracle(avmOpcodeCalldataCopy)]
+// unconstrained fn calldata_copy_opcode<let N: u32>(cdoffset: Field) -> [Field; N] {}
+fn handle_calldata_copy(
+    avm_instrs: &mut Vec<AvmInstruction>,
+    destinations: &Vec<ValueOrArray>,
+    inputs: &Vec<ValueOrArray>,
+) {
+    assert!(inputs.len() == 1);
+    assert!(destinations.len() == 1);
+
+    let cd_offset_maybe = inputs[0];
+    let cd_offset = match cd_offset_maybe {
+        ValueOrArray::MemoryAddress(slot_offset) => slot_offset.0,
+        _ => panic!("CalldataCopy address source should be a single value"),
+    };
+
+    let dest_offset_maybe = destinations[0];
+    let (dest_offset, dest_size) = match dest_offset_maybe {
+        ValueOrArray::HeapArray(HeapArray { pointer, size }) => (pointer.0, size),
+        _ => panic!("CalldataCopy destination should be an array"),
+    };
+
+    avm_instrs.push(AvmInstruction {
+        opcode: AvmOpcode::CALLDATACOPY,
+        indirect: Some(ALL_DIRECT),
+        operands: vec![
+            AvmOperand::U32 {
+                value: cd_offset as u32, // cdOffset (calldata offset)
+            },
+            AvmOperand::U32 { value: dest_size as u32 },
+            AvmOperand::U32 {
+                value: dest_offset as u32, // dstOffset
+            },
         ],
         ..Default::default()
     });
