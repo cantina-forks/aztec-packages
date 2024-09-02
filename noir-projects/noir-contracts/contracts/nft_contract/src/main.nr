@@ -143,7 +143,7 @@ contract NFT {
     }
 
     /// Prepares a shield partial note which can later on be finalized by the `finalizer`.
-    // TODO(#8238): Remove ther `note_randomness` argument below once we have partial notes delivery (then we can just
+    // TODO(#8238): Remove the `note_randomness` argument below once we have partial notes delivery (then we can just
     // fetch the randomness from oracle).
     #[aztec(private)]
     fn prepare_shield(
@@ -162,8 +162,8 @@ contract NFT {
             [shield_owner.to_field(), transient_storage_slot_randomness],
             TRANSIENT_STORAGE_SLOT_PEDERSEN_INDEX
         );
-        // Then we hash the owner storage slot commitment with finalizer and use that as a slot --> by hashing it with
-        // a finalizer we ensure that finalizer cannot interfere with slots not assigned to him.
+        // Then we hash the owner storage slot commitment with finalizer and use that as the final shield slot
+        // --> by hashing it with a finalizer we ensure that finalizer cannot interfere with slots not assigned to him.
         let slot: Field = pedersen_hash(
             [finalizer.to_field(), owner_storage_slot_commitment],
             TRANSIENT_STORAGE_SLOT_PEDERSEN_INDEX
@@ -175,8 +175,8 @@ contract NFT {
     #[aztec(public)]
     #[aztec(internal)]
     fn store_shield_in_transient_storage(point: NFTNoteHidingPoint, slot: Field) {
-        // We don't perform checks here whether the overwritten values are zero because the slots are siloed
-        // to the owner and hence the shield owner could interfere only with his own execution.
+        // We don't perform check for the overwritten value to be non-zero because the slots are siloed to the shield
+        // owner and hence the owner can interfere only with his own execution.
         context.storage_write(slot, point);
     }
 
@@ -187,7 +187,7 @@ contract NFT {
         owner_storage_slot_commitment: Field,
         nonce: Field
     ) {
-        // Perform authwit, owner and finalizer checks
+        // Perform authwit, owner and prepared shield checks
         if (!from.eq(context.msg_sender())) {
             assert_current_call_valid_authwit_public(&mut context, from);
         } else {
@@ -277,10 +277,11 @@ contract NFT {
         storage.public_owners.at(token_id).write(to);
     }
 
-    // Returns zero address when the token does not have public owner. Reverts if the token does not exist.
+    // Returns zero address when the token does not have a public owner. Reverts if the token does not exist.
     #[aztec(public)]
     #[aztec(view)]
     fn owner_of(token_id: Field) -> AztecAddress {
+        assert(storage.nft_exists.at(token_id).read(), "token does not exist");
         storage.public_owners.at(token_id).read()
     }
 

@@ -1,7 +1,7 @@
 use dep::aztec::{
     generators::{Ga1 as G_tid, Ga2 as G_npk, Ga3 as G_rnd, G_slot},
-    note::{note_getter_options::PropertySelector, utils::compute_note_hash_for_nullify},
-    keys::getters::get_nsk_app, oracle::unsafe_rand::unsafe_rand,
+    note::utils::compute_note_hash_for_nullify, keys::getters::get_nsk_app,
+    oracle::unsafe_rand::unsafe_rand,
     prelude::{AztecAddress, NoteInterface, NoteHeader, PrivateContext},
     protocol_types::{
     constants::GENERATOR_INDEX__NOTE_NULLIFIER, point::{Point, POINT_LENGTH},
@@ -9,8 +9,6 @@ use dep::aztec::{
 }
 };
 use std::{embedded_curve_ops::multi_scalar_mul, hash::from_field_unsafe};
-
-// Shows how to create a custom note
 
 global NFT_NOTE_LEN: Field = 3;
 // NFT_NOTE_LEN * 32 + 32(storage_slot as bytes) + 32(note_type_id as bytes)
@@ -49,7 +47,7 @@ impl NoteInterface<NFT_NOTE_LEN, NFT_NOTE_BYTES_LEN> for NFTNote {
     }
 
     fn compute_note_hiding_point(self) -> Point {
-        // We use the unsafe version because the multi_scalar_mul will constrain the scalars.
+        // We use the unsafe version because `multi_scalar_mul` will constrain the scalars.
         let token_id_scalar = from_field_unsafe(self.token_id);
         let npk_m_hash_scalar = from_field_unsafe(self.npk_m_hash);
         let randomness_scalar = from_field_unsafe(self.randomness);
@@ -83,7 +81,7 @@ struct NFTNoteHidingPoint {
 }
 
 impl NFTNoteHidingPoint {
-    // TODO(#8238): Remove ther randomness argument below
+    // TODO(#8238): Remove the randomness argument below
     fn new(npk_m_hash: Field, storage_slot: Field, randomness: Field) -> Self {
         // TODO(#8238): And uncomment this
         // let randomness = unsafe {
