@@ -1,13 +1,4 @@
-import {
-  type AccountWallet,
-  AztecAddress,
-  type AztecNode,
-  BatchCall,
-  ExtendedNote,
-  Fr,
-  Note,
-  type PXE,
-} from '@aztec/aztec.js';
+import { type AccountWallet, AztecAddress, BatchCall, ExtendedNote, Fr, Note } from '@aztec/aztec.js';
 import { deriveStorageSlotInMap } from '@aztec/circuits.js/hash';
 import { NFTContract } from '@aztec/noir-contracts.js';
 
@@ -20,8 +11,6 @@ const TIMEOUT = 120_000;
 describe('NFT', () => {
   jest.setTimeout(TIMEOUT);
 
-  let aztecNode: AztecNode;
-  let pxe: PXE;
   let teardown: () => Promise<void>;
 
   let nftContractAsAdmin: NFTContract;
@@ -34,11 +23,12 @@ describe('NFT', () => {
   let user1Wallet: AccountWallet;
   let user2Wallet: AccountWallet;
 
-  const TOKEN_ID = 6n;
+  // Arbitrary token id
+  const TOKEN_ID = Fr.random();
 
   beforeAll(async () => {
     let wallets: AccountWallet[];
-    ({ aztecNode, pxe, teardown, wallets } = await setup(4));
+    ({ teardown, wallets } = await setup(4));
     [adminWallet, minterWallet, user1Wallet, user2Wallet] = wallets;
 
     nftContractAsAdmin = await NFTContract.deploy(adminWallet, adminWallet.getAddress(), 'FROG', 'FRG')
@@ -69,12 +59,12 @@ describe('NFT', () => {
     const finalizer = user1Wallet.getAddress();
     const randomness = Fr.random();
 
-    const { txHash } = await new BatchCall(user1Wallet, [
+    const { txHash, debugInfo } = await new BatchCall(user1Wallet, [
       nftContractAsUser1.methods.prepare_shield(finalizer, randomness).request(),
       nftContractAsUser1.methods.send_to_shield(finalizer, TOKEN_ID, 0).request(),
     ])
       .send()
-      .wait();
+      .wait({ debug: true });
 
     const publicOwnerAfter = await nftContractAsUser1.methods.owner_of(TOKEN_ID).simulate();
     expect(publicOwnerAfter).toEqual(AztecAddress.ZERO);
@@ -97,12 +87,13 @@ describe('NFT', () => {
       ),
     );
 
-    // TODO: check "transient storage" was correctly reset
-    // const txEffect = await aztecNode.getTxEffect(txHash);
-    // console.log('txEffect', txEffect);
-
-    const privateNfts = await getPrivateNfts(user1Wallet.getAddress());
-    expect(privateNfts).toEqual([TOKEN_ID]);
+    // We should get 5 data writes setting values to 0 - 3 for note hiding point, 1 for finalizer, 1 for public owner
+    // (we shield so public owner is set to 0). Ideally we would have here only 1 data write as the 4 values change
+    // from zero to non-zero to zero in the tx and hence no write could be committed. This makes public writes
+    // squashing too expensive for transient storage. This however probably does not matter as I assume we will want
+    // to implement a real transient storage anyway. (Informed Leila about the potential optimization.)
+    const publicDataWritesValues = debugInfo!.publicDataWrites!.map(write => write.newValue.toBigInt());
+    expect(publicDataWritesValues).toEqual([0n, 0n, 0n, 0n, 0n]);
   });
 
   it('privately sends', async () => {
@@ -111,11 +102,11 @@ describe('NFT', () => {
       .send()
       .wait();
 
-      const user1Nfts = await getPrivateNfts(user1Wallet.getAddress());
-      expect(user1Nfts).toEqual([]);
+    const user1Nfts = await getPrivateNfts(user1Wallet.getAddress());
+    expect(user1Nfts).toEqual([]);
 
-      const user2Nfts = await getPrivateNfts(user2Wallet.getAddress());
-      expect(user2Nfts).toEqual([TOKEN_ID]);
+    const user2Nfts = await getPrivateNfts(user2Wallet.getAddress());
+    expect(user2Nfts).toEqual([TOKEN_ID]);
   });
 
   it('unshields', async () => {
@@ -150,7 +141,7 @@ describe('NFT', () => {
     if (pageLimitReached) {
       throw new Error('Page limit reached and pagination not implemented in test');
     }
-    // We prune zeroed out values
+    // We prune placeholder values
     return nfts.filter((tokenId: bigint) => tokenId !== 0n);
-  }
+  };
 });

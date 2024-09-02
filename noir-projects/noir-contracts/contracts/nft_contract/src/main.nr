@@ -294,8 +294,4 @@ contract NFT {
         let page_limit_reached = notes.len() == options.limit;
         (owned_nft_ids, page_limit_reached)
     }
-    // unconstrained fn token_uri(token_id: Field) -> pub str<URI_LENGTH> {
-    //     // concatenate the base URI with the token ID and return it
-    //     ...
-    // }
 }
