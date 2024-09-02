@@ -123,13 +123,14 @@ contract NFT {
         storage.public_owners.at(token_id).write(to);
     }
 
+    // TODO(#8238): Remove ther randomness argument below
     #[aztec(private)]
-    fn prepare_shield(finalizer: AztecAddress) {
+    fn prepare_shield(finalizer: AztecAddress, randomness: Field) {
         // We create a partial NFT note with unpopulated/zero token id for msg_sender
         let shield_owner = context.msg_sender();
         let shield_owner_npk_m_hash = get_current_public_keys(&mut context, shield_owner).npk_m.hash();
         let shield_note_slot = storage.private_nfts.at(shield_owner).storage_slot;
-        let hiding_point = NFTNoteHidingPoint::new(shield_owner_npk_m_hash, shield_note_slot);
+        let hiding_point = NFTNoteHidingPoint::new(shield_owner_npk_m_hash, shield_note_slot, randomness);
         // TODO(benesjan): Properly derive storage slot such that it's ensured slots will not collide in case of multiple prepared shields
         NFT::at(context.this_address()).store_shield_in_transient_storage(hiding_point, finalizer, TRANSIENT_STORAGE_SLOT).enqueue(&mut context);
     }

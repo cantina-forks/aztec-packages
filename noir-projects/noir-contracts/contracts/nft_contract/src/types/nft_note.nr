@@ -83,10 +83,12 @@ struct NFTNoteHidingPoint {
 }
 
 impl NFTNoteHidingPoint {
-    fn new(npk_m_hash: Field, storage_slot: Field) -> Self {
-        let randomness = unsafe {
-            unsafe_rand()
-        };
+    // TODO(#8238): Remove ther randomness argument below
+    fn new(npk_m_hash: Field, storage_slot: Field, randomness: Field) -> Self {
+        // TODO(#8238): And uncomment this
+        // let randomness = unsafe {
+        //     unsafe_rand()
+        // };
         let note = NFTNote {
             header: NoteHeader { contract_address: AztecAddress::zero(), nonce: 0, storage_slot, note_hash_counter: 0 },
             token_id: 0,
