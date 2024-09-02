@@ -5,9 +5,10 @@ mod types;
 contract NFT {
     use dep::compressed_string::FieldCompressedString;
     use dep::aztec::{
-        prelude::{NoteGetterOptions, Map, PublicMutable, SharedImmutable, PrivateSet, AztecAddress},
+        prelude::{NoteGetterOptions, NoteViewerOptions, Map, PublicMutable, SharedImmutable, PrivateSet, AztecAddress},
         encrypted_logs::{encrypted_note_emission::encode_and_encrypt_note_with_keys},
-        keys::getters::get_current_public_keys, protocol_types::traits::is_empty
+        keys::getters::get_current_public_keys, note::constants::MAX_NOTES_PER_PAGE,
+        protocol_types::traits::is_empty
     };
     use dep::authwit::auth::{assert_current_call_valid_authwit, assert_current_call_valid_authwit_public, compute_authwit_nullifier};
     use crate::types::nft_note::{NFTNote, NFTNoteHidingPoint};
@@ -270,10 +271,27 @@ contract NFT {
     fn owner_of(token_id: Field) -> AztecAddress {
         storage.public_owners.at(token_id).read()
     }
-    // // Returns the total number of NFTs a given address owns in private.
-    // unconstrained fn balance_of_private(owner: AztecAddress) -> pub Field {
-    //     ...
-    // }
+
+    // Returns a list of token IDs owned by the address in private, supports pagination.
+    unconstrained fn get_private_nfts(
+        owner: AztecAddress,
+        page_index: u32
+    ) -> pub (bool, [Field; MAX_NOTES_PER_PAGE]) {
+        let offset = page_index * MAX_NOTES_PER_PAGE as u32; // TODO(benesjan): change MAX_NOTES_PER_PAGE to u32?
+        let mut options = NoteViewerOptions::new();
+        let notes = storage.private_nfts.at(owner).view_notes(options.set_offset(offset));
+
+        let mut owned_nft_ids = [0; MAX_NOTES_PER_PAGE];
+        for i in 0..options.limit {
+            if i < notes.len() {
+                owned_nft_ids[i] = notes.get_unchecked(i).token_id;
+            }
+        }
+
+        let page_limit_reached = notes.len() == options.limit;
+
+        (page_limit_reached, owned_nft_ids)
+    }
     // unconstrained fn token_uri(token_id: Field) -> pub str<URI_LENGTH> {
     //     // concatenate the base URI with the token ID and return it
     //     ...
