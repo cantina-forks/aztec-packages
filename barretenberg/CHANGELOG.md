@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.53.0](https://github.com/AztecProtocol/aztec-packages/compare/barretenberg-v0.52.0...barretenberg-v0.53.0) (2024-09-02)
+
+
+### Miscellaneous
+
+* **avm:** Move proving key to avm files ([#8318](https://github.com/AztecProtocol/aztec-packages/issues/8318)) ([32d67bd](https://github.com/AztecProtocol/aztec-packages/commit/32d67bd72244bfc3ea28aef7358c467a5b238b6b))
+* Uncomment asserts in oink rec verifier ([#8316](https://github.com/AztecProtocol/aztec-packages/issues/8316)) ([a7f3144](https://github.com/AztecProtocol/aztec-packages/commit/a7f314448215950f6f1a7d4f282359df040be502))
+
 ## [0.52.0](https://github.com/AztecProtocol/aztec-packages/compare/barretenberg-v0.51.1...barretenberg-v0.52.0) (2024-09-01)
 
 

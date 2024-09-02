@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.53.0](https://github.com/AztecProtocol/aztec-packages/compare/aztec-packages-v0.52.0...aztec-packages-v0.53.0) (2024-09-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* Do not encode assertion strings in the programs ([#8315](https://github.com/AztecProtocol/aztec-packages/issues/8315))
+
+### Features
+
+* Add bot config to toggle simulation ([#8297](https://github.com/AztecProtocol/aztec-packages/issues/8297)) ([1c7c447](https://github.com/AztecProtocol/aztec-packages/commit/1c7c44742d0b3e6940ea08a42085d236fd209cad))
+* Do not encode assertion strings in the programs ([#8315](https://github.com/AztecProtocol/aztec-packages/issues/8315)) ([f5bbb89](https://github.com/AztecProtocol/aztec-packages/commit/f5bbb89b489bc85f286bcc5ed45c30f38032810c))
+* Sync from aztec-packages (https://github.com/noir-lang/noir/pull/5877) ([27e4761](https://github.com/AztecProtocol/aztec-packages/commit/27e476119021c4fe4f6e4e8cb53947215458d4d0))
+* Tuple return value typescript decoding ([#8319](https://github.com/AztecProtocol/aztec-packages/issues/8319)) ([b09a1bb](https://github.com/AztecProtocol/aztec-packages/commit/b09a1bbcc31ac0af5f23e7c9677ef922d5da5239))
+
+
+### Bug Fixes
+
+* Bot config for skip public simulation ([#8320](https://github.com/AztecProtocol/aztec-packages/issues/8320)) ([133b642](https://github.com/AztecProtocol/aztec-packages/commit/133b642b12ff03c71bd90a4acda10f484fe1b77f))
+
+
+### Miscellaneous
+
+* **avm:** Move proving key to avm files ([#8318](https://github.com/AztecProtocol/aztec-packages/issues/8318)) ([32d67bd](https://github.com/AztecProtocol/aztec-packages/commit/32d67bd72244bfc3ea28aef7358c467a5b238b6b))
+* **docs:** Cli wallet ([#8182](https://github.com/AztecProtocol/aztec-packages/issues/8182)) ([7298c8f](https://github.com/AztecProtocol/aztec-packages/commit/7298c8f54460f506ecb959658d9cfd4f1129ef01))
+* Send anvil logs to stdout ([#8311](https://github.com/AztecProtocol/aztec-packages/issues/8311)) ([6a2614a](https://github.com/AztecProtocol/aztec-packages/commit/6a2614a94a7b049e8aecaaa900b0a067dd2e15dd))
+* Uncomment asserts in oink rec verifier ([#8316](https://github.com/AztecProtocol/aztec-packages/issues/8316)) ([a7f3144](https://github.com/AztecProtocol/aztec-packages/commit/a7f314448215950f6f1a7d4f282359df040be502))
+
 ## [0.52.0](https://github.com/AztecProtocol/aztec-packages/compare/aztec-packages-v0.51.1...aztec-packages-v0.52.0) (2024-09-01)
 
 
