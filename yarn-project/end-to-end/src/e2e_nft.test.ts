@@ -46,6 +46,8 @@ describe('NFT', () => {
   // NOTE: This test is sequential and each test case depends on the previous one
   it('sets minter', async () => {
     await nftContractAsAdmin.methods.set_minter(minterWallet.getAddress(), true).send().wait();
+    const isMinterAMinter = await nftContractAsAdmin.methods.is_minter(minterWallet.getAddress()).simulate();
+    expect(isMinterAMinter).toBe(true);
   });
 
   it('minter mints to a user', async () => {
