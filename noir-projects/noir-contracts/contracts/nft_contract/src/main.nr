@@ -66,6 +66,7 @@ contract NFT {
 
     #[aztec(public)]
     fn mint(to: AztecAddress, token_id: Field) {
+        assert(token_id != 0, "zero token ID not supported");
         assert(storage.minters.at(context.msg_sender()).read(), "caller is not a minter");
         assert(storage.nft_exists.at(token_id).read() == false, "token already exists");
 
@@ -273,10 +274,8 @@ contract NFT {
     }
 
     // Returns a list of token IDs owned by the address in private, supports pagination.
-    unconstrained fn get_private_nfts(
-        owner: AztecAddress,
-        page_index: u32
-    ) -> pub (bool, [Field; MAX_NOTES_PER_PAGE]) {
+    unconstrained fn get_private_nfts(owner: AztecAddress, page_index: u32) -> pub [Field; MAX_NOTES_PER_PAGE] {
+        // ) -> pub (bool, [Field; MAX_NOTES_PER_PAGE]) {
         let offset = page_index * MAX_NOTES_PER_PAGE as u32; // TODO(benesjan): change MAX_NOTES_PER_PAGE to u32?
         let mut options = NoteViewerOptions::new();
         let notes = storage.private_nfts.at(owner).view_notes(options.set_offset(offset));
@@ -288,9 +287,10 @@ contract NFT {
             }
         }
 
-        let page_limit_reached = notes.len() == options.limit;
+        // let page_limit_reached = notes.len() == options.limit;
 
-        (page_limit_reached, owned_nft_ids)
+        // (page_limit_reached, owned_nft_ids)
+        owned_nft_ids
     }
     // unconstrained fn token_uri(token_id: Field) -> pub str<URI_LENGTH> {
     //     // concatenate the base URI with the token ID and return it

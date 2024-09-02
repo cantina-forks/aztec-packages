@@ -34,7 +34,7 @@ describe('NFT', () => {
   let user1Wallet: AccountWallet;
   let user2Wallet: AccountWallet;
 
-  const TOKEN_ID = 6;
+  const TOKEN_ID = 6n;
 
   beforeAll(async () => {
     let wallets: AccountWallet[];
@@ -100,6 +100,9 @@ describe('NFT', () => {
     // TODO: check "transient storage" was correctly reset
     // const txEffect = await aztecNode.getTxEffect(txHash);
     // console.log('txEffect', txEffect);
+
+    const privateNfts = await getPrivateNfts(user1Wallet.getAddress());
+    expect(privateNfts).toEqual([TOKEN_ID]);
   });
 
   it('privately sends', async () => {
@@ -107,6 +110,12 @@ describe('NFT', () => {
       .transfer_from(user1Wallet.getAddress(), user2Wallet.getAddress(), TOKEN_ID, 0)
       .send()
       .wait();
+
+      const user1Nfts = await getPrivateNfts(user1Wallet.getAddress());
+      expect(user1Nfts).toEqual([]);
+
+      const user2Nfts = await getPrivateNfts(user2Wallet.getAddress());
+      expect(user2Nfts).toEqual([TOKEN_ID]);
   });
 
   it('unshields', async () => {
@@ -135,4 +144,10 @@ describe('NFT', () => {
     const publicOwnerAfter = await nftContractAsUser1.methods.owner_of(TOKEN_ID).simulate();
     expect(publicOwnerAfter).toEqual(AztecAddress.ZERO);
   });
+
+  const getPrivateNfts = async (owner: AztecAddress) => {
+    const nfts = await nftContractAsUser1.methods.get_private_nfts(owner, 0).simulate();
+    // We prune zeroed out values
+    return nfts.filter((tokenId: bigint) => tokenId !== 0n);
+  }
 });
