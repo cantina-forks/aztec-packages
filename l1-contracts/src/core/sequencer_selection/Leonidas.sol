@@ -62,7 +62,7 @@ contract Leonidas is Ownable, ILeonidas {
 
   // The target number of validators in a committee
   // @todo #8021
-  uint256 public constant TARGET_COMMITTEE_SIZE = EPOCH_DURATION;
+  uint256 public constant TARGET_COMMITTEE_SIZE = Constants.AZTEC_TARGET_COMMITTEE_SIZE;
 
   // The time that the contract was deployed
   uint256 public immutable GENESIS_TIME;

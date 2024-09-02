@@ -455,7 +455,10 @@ export async function setup(
     deployL1ContractsValues.l1ContractAddresses.rollupAddress,
     deployL1ContractsValues.publicClient,
   );
-  watcher.start();
+
+  if (!opts.l1BlockTime) {
+    watcher.start();
+  }
 
   const wallets = numberOfAccounts > 0 ? await createAccounts(pxe, numberOfAccounts) : [];
   const cheatCodes = CheatCodes.create(config.l1RpcUrl, pxe!);

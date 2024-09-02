@@ -16,7 +16,7 @@ describe('e2e_l1_with_wall_time', () => {
     const account = privateKeyToAccount(`0x${getPrivateKeyFromIndex(0)!.toString('hex')}`);
     const initialValidators = [EthAddress.fromString(account.address)];
 
-    ({ teardown, logger, pxe } = await setup(0, { initialValidators, l1BlockTime: 12 }));
+    ({ teardown, logger, pxe } = await setup(0, { initialValidators, l1BlockTime: 12, salt: 420 }));
   });
 
   afterEach(() => teardown());
