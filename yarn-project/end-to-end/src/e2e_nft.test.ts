@@ -63,7 +63,7 @@ describe('NFT', () => {
     expect(ownerAfterMint).toEqual(user1Wallet.getAddress());
   });
 
-  it('user shields', async () => {
+  it('shields', async () => {
     // In a simple shield flow the finalizer is the user itself (in the uniswap swap to shield flow it would be
     // the uniswap contract)
     const finalizer = user1Wallet.getAddress();
@@ -102,10 +102,37 @@ describe('NFT', () => {
     // console.log('txEffect', txEffect);
   });
 
-  it('user privately sends', async () => {
+  it('privately sends', async () => {
     await nftContractAsUser1.methods
       .transfer_from(user1Wallet.getAddress(), user2Wallet.getAddress(), TOKEN_ID, 0)
       .send()
       .wait();
+  });
+
+  it('unshields', async () => {
+    await nftContractAsUser2.methods
+      .unshield(user2Wallet.getAddress(), user2Wallet.getAddress(), TOKEN_ID, 0)
+      .send()
+      .wait();
+
+    const publicOwnerAfter = await nftContractAsUser2.methods.owner_of(TOKEN_ID).simulate();
+    expect(publicOwnerAfter).toEqual(user2Wallet.getAddress());
+  });
+
+  it('publicly sends', async () => {
+    await nftContractAsUser2.methods
+      .transfer_public(user2Wallet.getAddress(), user1Wallet.getAddress(), TOKEN_ID, 0)
+      .send()
+      .wait();
+
+    const publicOwnerAfter = await nftContractAsUser2.methods.owner_of(TOKEN_ID).simulate();
+    expect(publicOwnerAfter).toEqual(user1Wallet.getAddress());
+  });
+
+  it('burns', async () => {
+    await nftContractAsUser1.methods.burn(user1Wallet.getAddress(), TOKEN_ID, 0).send().wait();
+
+    const publicOwnerAfter = await nftContractAsUser1.methods.owner_of(TOKEN_ID).simulate();
+    expect(publicOwnerAfter).toEqual(AztecAddress.ZERO);
   });
 });

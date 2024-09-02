@@ -123,7 +123,25 @@ contract NFT {
         storage.public_owners.at(token_id).write(to);
     }
 
-    // TODO(#8238): Remove ther randomness argument below
+    // We have only public burn flow because the flow is not that common for it to be worth it to clutter
+    // the contract with a private one.
+    #[aztec(public)]
+    fn burn(from: AztecAddress, token_id: Field, nonce: Field) {
+        if (!from.eq(context.msg_sender())) {
+            assert_current_call_valid_authwit_public(&mut context, from);
+        } else {
+            assert(nonce == 0, "invalid nonce");
+        }
+
+        let public_owner = storage.public_owners.at(token_id).read();
+        assert(public_owner.eq(from), "invalid owner");
+
+        storage.nft_exists.at(token_id).write(false);
+        storage.public_owners.at(token_id).write(AztecAddress::zero());
+    }
+
+    // TODO(#8238): Remove ther randomness argument below once we have partial notes delivery (then we can just fetch
+    // the randomness from oracle).
     #[aztec(private)]
     fn prepare_shield(finalizer: AztecAddress, randomness: Field) {
         // We create a partial NFT note with unpopulated/zero token id for msg_sender
@@ -215,7 +233,7 @@ contract NFT {
         let mut options = NoteGetterOptions::new();
         options = options.select(NFTNote::properties().token_id, token_id, Option::none()).set_limit(1);
         let notes = nfts.at(from).pop_notes(options);
-        assert(notes.len() == 1, "NFT not found");
+        assert(notes.len() == 1, "NFT not found when transferring");
 
         let from_ovpk_m = get_current_public_keys(&mut context, from).ovpk_m;
         let to_keys = get_current_public_keys(&mut context, to);
@@ -225,13 +243,25 @@ contract NFT {
     }
 
     #[aztec(private)]
-    fn unshield(from: AztecAddress, to: AztecAddress, amount: Field, nonce: Field) {
+    fn unshield(from: AztecAddress, to: AztecAddress, token_id: Field, nonce: Field) {
         if (!from.eq(context.msg_sender())) {
             assert_current_call_valid_authwit(&mut context, from);
         } else {
             assert(nonce == 0, "invalid nonce");
         }
-        // ...
+
+        let mut options = NoteGetterOptions::new();
+        options = options.select(NFTNote::properties().token_id, token_id, Option::none()).set_limit(1);
+        let notes = storage.private_nfts.at(from).pop_notes(options);
+        assert(notes.len() == 1, "NFT not found when unshielding");
+
+        NFT::at(context.this_address())._finish_unshield(to, token_id).enqueue(&mut context);
+    }
+
+    #[aztec(public)]
+    #[aztec(internal)]
+    fn _finish_unshield(to: AztecAddress, token_id: Field) {
+        storage.public_owners.at(token_id).write(to);
     }
 
     // Returns zero address when the token does not have public owner. Reverts if the token does not exist.
