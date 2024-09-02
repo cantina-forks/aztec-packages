@@ -7,13 +7,13 @@ contract NFT {
     use dep::aztec::{
         prelude::{NoteGetterOptions, NoteViewerOptions, Map, PublicMutable, SharedImmutable, PrivateSet, AztecAddress},
         encrypted_logs::{encrypted_note_emission::encode_and_encrypt_note_with_keys},
-        keys::getters::get_current_public_keys, note::constants::MAX_NOTES_PER_PAGE,
-        protocol_types::traits::is_empty
+        hash::pedersen_hash, keys::getters::get_current_public_keys,
+        note::constants::MAX_NOTES_PER_PAGE, protocol_types::traits::is_empty
     };
     use dep::authwit::auth::{assert_current_call_valid_authwit, assert_current_call_valid_authwit_public, compute_authwit_nullifier};
     use crate::types::nft_note::{NFTNote, NFTNoteHidingPoint};
 
-    global TRANSIENT_STORAGE_SLOT = 6000;
+    global TRANSIENT_STORAGE_SLOT_PEDERSEN_INDEX = 3;
 
     // TODO: Rename this to Transfer - calling this Transfer2 to avoid export conflict with the Transfer event in
     // the Token contract
@@ -142,42 +142,51 @@ contract NFT {
         storage.public_owners.at(token_id).write(AztecAddress::zero());
     }
 
-    // TODO(#8238): Remove ther randomness argument below once we have partial notes delivery (then we can just fetch
-    // the randomness from oracle).
+    /// Prepares a shield partial note which can later on be finalized by the `finalizer`.
+    // TODO(#8238): Remove ther `note_randomness` argument below once we have partial notes delivery (then we can just
+    // fetch the randomness from oracle).
     #[aztec(private)]
-    fn prepare_shield(finalizer: AztecAddress, randomness: Field) {
+    fn prepare_shield(
+        finalizer: AztecAddress,
+        note_randomness: Field,
+        transient_storage_slot_randomness: Field
+    ) {
         // We create a partial NFT note with unpopulated/zero token id for msg_sender
         let shield_owner = context.msg_sender();
         let shield_owner_npk_m_hash = get_current_public_keys(&mut context, shield_owner).npk_m.hash();
         let shield_note_slot = storage.private_nfts.at(shield_owner).storage_slot;
-        let hiding_point = NFTNoteHidingPoint::new(shield_owner_npk_m_hash, shield_note_slot, randomness);
-        // TODO(benesjan): Properly derive storage slot such that it's ensured slots will not collide in case of multiple prepared shields
-        NFT::at(context.this_address()).store_shield_in_transient_storage(hiding_point, finalizer, TRANSIENT_STORAGE_SLOT).enqueue(&mut context);
+        let hiding_point = NFTNoteHidingPoint::new(shield_owner_npk_m_hash, shield_note_slot, note_randomness);
+
+        // We make the owner part of the slot preimage to ensure he cannot interfere with non-owner's slots
+        let owner_storage_slot_commitment: Field = pedersen_hash(
+            [shield_owner.to_field(), transient_storage_slot_randomness],
+            TRANSIENT_STORAGE_SLOT_PEDERSEN_INDEX
+        );
+        // Then we hash the owner storage slot commitment with finalizer and use that as a slot --> by hashing it with
+        // a finalizer we ensure that finalizer cannot interfere with slots not assigned to him.
+        let slot: Field = pedersen_hash(
+            [finalizer.to_field(), owner_storage_slot_commitment],
+            TRANSIENT_STORAGE_SLOT_PEDERSEN_INDEX
+        );
+
+        NFT::at(context.this_address()).store_shield_in_transient_storage(hiding_point, slot).enqueue(&mut context);
     }
 
     #[aztec(public)]
     #[aztec(internal)]
-    fn store_shield_in_transient_storage(
-        point: NFTNoteHidingPoint,
-        finalizer: AztecAddress,
-        slot: Field
-    ) {
-        let finalizer_slot = slot;
-        // Finalizer occupies just one slot so we can use the slots that follow for the point
-        let point_slot = slot + 1;
-
-        // TODO(benesjan): If we have properly derived slots we don't have to perform the following checks
-        let previous_finalizer: AztecAddress = context.storage_read(finalizer_slot);
-        let previous_point_value: NFTNoteHidingPoint = context.storage_read(point_slot);
-        assert(is_empty(previous_point_value), "non-zero point transient storage");
-        assert(previous_finalizer.is_zero(), "non-zero finalizer transient storage");
-
-        context.storage_write(finalizer_slot, finalizer);
-        context.storage_write(point_slot, point);
+    fn store_shield_in_transient_storage(point: NFTNoteHidingPoint, slot: Field) {
+        // We don't perform checks here whether the overwritten values are zero because the slots are siloed
+        // to the owner and hence the shield owner could interfere only with his own execution.
+        context.storage_write(slot, point);
     }
 
     #[aztec(public)]
-    fn send_to_shield(from: AztecAddress, token_id: Field, nonce: Field) {
+    fn send_to_shield(
+        from: AztecAddress,
+        token_id: Field,
+        owner_storage_slot_commitment: Field,
+        nonce: Field
+    ) {
         // Perform authwit, owner and finalizer checks
         if (!from.eq(context.msg_sender())) {
             assert_current_call_valid_authwit_public(&mut context, from);
@@ -188,27 +197,29 @@ contract NFT {
         let current_owner = storage.public_owners.at(token_id).read();
         assert(current_owner.eq(from), "invalid NFT owner");
 
-        // TODO(benesjan): Pass the slot as a function arg
-        let finalizer_slot = TRANSIENT_STORAGE_SLOT;
-        let point_slot = TRANSIENT_STORAGE_SLOT + 1;
+        // Derive the shield slot from the owner storage slot commitment and the finalizer address (declared
+        // as `from` in this function)
+        let shield_slot = pedersen_hash(
+            [from.to_field(), owner_storage_slot_commitment],
+            TRANSIENT_STORAGE_SLOT_PEDERSEN_INDEX
+        );
 
-        let expected_finalizer: AztecAddress = context.storage_read(finalizer_slot);
-        assert(expected_finalizer.eq(from), "invalid finalizer");
+        // Read the hiding point from "transient" storage and check it's not empty to ensure the shield was prepared
+        let mut hiding_point: NFTNoteHidingPoint = context.storage_read(shield_slot);
+        assert(!is_empty(hiding_point), "shield not prepared");
 
         // Set the original NFT owner to zero
         storage.public_owners.at(token_id).write(AztecAddress::zero());
 
         // Read the NFT hiding point from "transient" storage and add the token ID to it
-        let mut hiding_point: NFTNoteHidingPoint = context.storage_read(point_slot);
         hiding_point.add_token_id(token_id);
 
         // Insert the finalized note
         let note_hash = hiding_point.finalize();
         context.push_note_hash(note_hash);
 
-        // At last we reset the values to zero to achieve the effect of transient storage - kernels will squash the writes
-        context.storage_write(finalizer_slot, AztecAddress::zero());
-        context.storage_write(point_slot, NFTNoteHidingPoint::empty());
+        // At last we reset the shield to zero to achieve the effect of transient storage - kernels will squash the writes
+        context.storage_write(shield_slot, NFTNoteHidingPoint::empty());
     }
 
     /**

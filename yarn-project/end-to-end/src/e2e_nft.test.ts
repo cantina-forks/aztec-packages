@@ -1,5 +1,6 @@
 import { type AccountWallet, AztecAddress, BatchCall, ExtendedNote, Fr, Note } from '@aztec/aztec.js';
 import { deriveStorageSlotInMap } from '@aztec/circuits.js/hash';
+import { pedersenHash } from '@aztec/foundation/crypto';
 import { NFTContract } from '@aztec/noir-contracts.js';
 
 import { jest } from '@jest/globals';
@@ -24,7 +25,8 @@ describe('NFT', () => {
   let user2Wallet: AccountWallet;
 
   // Arbitrary token id
-  const TOKEN_ID = Fr.random();
+  const TOKEN_ID = Fr.random().toBigInt();
+  const TRANSIENT_STORAGE_SLOT_PEDERSEN_INDEX = 3;
 
   beforeAll(async () => {
     let wallets: AccountWallet[];
@@ -57,11 +59,16 @@ describe('NFT', () => {
     // In a simple shield flow the finalizer is the user itself (in the uniswap swap to shield flow it would be
     // the uniswap contract)
     const finalizer = user1Wallet.getAddress();
-    const randomness = Fr.random();
+    const noteRandomness = Fr.random();
+    const transientStorageSlotRandomness = Fr.random();
+    const ownerStorageSlotCommitment = pedersenHash(
+      [user1Wallet.getAddress(), transientStorageSlotRandomness],
+      TRANSIENT_STORAGE_SLOT_PEDERSEN_INDEX,
+    );
 
     const { txHash, debugInfo } = await new BatchCall(user1Wallet, [
-      nftContractAsUser1.methods.prepare_shield(finalizer, randomness).request(),
-      nftContractAsUser1.methods.send_to_shield(finalizer, TOKEN_ID, 0).request(),
+      nftContractAsUser1.methods.prepare_shield(finalizer, noteRandomness, transientStorageSlotRandomness).request(),
+      nftContractAsUser1.methods.send_to_shield(finalizer, TOKEN_ID, ownerStorageSlotCommitment, 0).request(),
     ])
       .send()
       .wait({ debug: true });
@@ -73,7 +80,7 @@ describe('NFT', () => {
     const nftNote = new Note([
       new Fr(TOKEN_ID),
       user1Wallet.getCompleteAddress().publicKeys.masterNullifierPublicKey.hash(),
-      randomness,
+      noteRandomness,
     ]);
 
     await user1Wallet.addNote(
@@ -87,13 +94,13 @@ describe('NFT', () => {
       ),
     );
 
-    // We should get 5 data writes setting values to 0 - 3 for note hiding point, 1 for finalizer, 1 for public owner
-    // (we shield so public owner is set to 0). Ideally we would have here only 1 data write as the 4 values change
-    // from zero to non-zero to zero in the tx and hence no write could be committed. This makes public writes
-    // squashing too expensive for transient storage. This however probably does not matter as I assume we will want
-    // to implement a real transient storage anyway. (Informed Leila about the potential optimization.)
+    // We should get 4 data writes setting values to 0 - 3 for note hiding point and 1 for public owner (we shield so
+    // public owner is set to 0). Ideally we would have here only 1 data write as the 4 values change from zero
+    // to non-zero to zero in the tx and hence no write could be committed. This makes public writes squashing too
+    // expensive for transient storage. This however probably does not matter as I assume we will want to implement
+    // a real transient storage anyway. (Informed Leila about the potential optimization.)
     const publicDataWritesValues = debugInfo!.publicDataWrites!.map(write => write.newValue.toBigInt());
-    expect(publicDataWritesValues).toEqual([0n, 0n, 0n, 0n, 0n]);
+    expect(publicDataWritesValues).toEqual([0n, 0n, 0n, 0n]);
   });
 
   it('privately sends', async () => {
