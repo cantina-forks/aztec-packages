@@ -146,7 +146,10 @@ describe('NFT', () => {
   });
 
   const getPrivateNfts = async (owner: AztecAddress) => {
-    const nfts = await nftContractAsUser1.methods.get_private_nfts(owner, 0).simulate();
+    const [nfts, pageLimitReached] = await nftContractAsUser1.methods.get_private_nfts(owner, 0).simulate();
+    if (pageLimitReached) {
+      throw new Error('Page limit reached and pagination not implemented in test');
+    }
     // We prune zeroed out values
     return nfts.filter((tokenId: bigint) => tokenId !== 0n);
   }

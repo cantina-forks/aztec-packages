@@ -273,12 +273,13 @@ contract NFT {
         storage.public_owners.at(token_id).read()
     }
 
-    // Returns a list of token IDs owned by the address in private and a flag indicating whether a page limit was
-    // reached.
+    /// Returns an array of token IDs owned by the `onwer` in private and a flag indicating whether a page limit was
+    /// reached. Starts getting the notes from page with index `page_index`. Zero values in the array are placeholder
+    /// values for non-existing notes.
     unconstrained fn get_private_nfts(
         owner: AztecAddress,
         page_index: u32
-    ) -> pub (bool, [Field; MAX_NOTES_PER_PAGE]) {
+    ) -> pub ([Field; MAX_NOTES_PER_PAGE], bool) {
         let offset = page_index * MAX_NOTES_PER_PAGE as u32; // TODO(benesjan): change MAX_NOTES_PER_PAGE to u32?
         let mut options = NoteViewerOptions::new();
         let notes = storage.private_nfts.at(owner).view_notes(options.set_offset(offset));
@@ -291,7 +292,7 @@ contract NFT {
         }
 
         let page_limit_reached = notes.len() == options.limit;
-        (page_limit_reached, owned_nft_ids)
+        (owned_nft_ids, page_limit_reached)
     }
     // unconstrained fn token_uri(token_id: Field) -> pub str<URI_LENGTH> {
     //     // concatenate the base URI with the token ID and return it
