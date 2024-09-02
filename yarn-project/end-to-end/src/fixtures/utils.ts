@@ -389,7 +389,23 @@ export async function setup(
 
   if (PXE_URL) {
     // we are setting up against a remote environment, l1 contracts are assumed to already be deployed
-    return await setupWithRemoteEnvironment(publisherHdAccount!, config, logger, numberOfAccounts, enableGas);
+    const remote = await setupWithRemoteEnvironment(publisherHdAccount!, config, logger, numberOfAccounts, enableGas);
+
+    const watcher = new Watcher(
+      new EthCheatCodes(config.l1RpcUrl),
+      remote.deployL1ContractsValues.l1ContractAddresses.rollupAddress,
+      remote.deployL1ContractsValues.publicClient,
+    );
+
+    if (!opts.l1BlockTime) {
+      watcher.start();
+    }
+
+    remote.teardown = async () => {
+      await watcher.stop();
+    };
+
+    return remote;
   }
 
   const deployL1ContractsValues =
